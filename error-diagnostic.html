@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Diagnostic Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .error-box {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #f5c6cb;
+            margin: 10px 0;
+        }
+        .success-box {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #c3e6cb;
+            margin: 10px 0;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Error Diagnostic Tool</h1>
+    
+    <div class="section">
+        <h2>1. Check JavaScript Errors</h2>
+        <div id="jsErrors"></div>
+        <button onclick="checkJSErrors()">Check for JS Errors</button>
+    </div>
+    
+    <div class="section">
+        <h2>2. Test Data Loading</h2>
+        <div id="dataStatus"></div>
+        <button onclick="testDataLoading()">Test Data Loading</button>
+    </div>
+    
+    <div class="section">
+        <h2>3. Test Form Submission</h2>
+        <div id="formTest"></div>
+        <button onclick="testFormSubmission()">Test Form Submission</button>
+    </div>
+    
+    <div class="section">
+        <h2>4. Console Logs</h2>
+        <div id="consoleLogs"></div>
+        <button onclick="captureConsoleLogs()">Capture Console Logs</button>
+    </div>
+    
+    <div class="section">
+        <h2>5. Compare with Excel Example</h2>
+        <p><strong>Example 1 from Excel:</strong></p>
+        <ul>
+            <li>Location: South Telangana</li>
+            <li>Crop: Rabi Paddy</li>
+            <li>Soil Status: N-Medium, P-Low, K-High</li>
+            <li>Required: N=48, P=32, K=11</li>
+            <li>Expected Final: N=51.2, P=33, K=12, S=6.5</li>
+        </ul>
+        <div id="excelComparison"></div>
+        <button onclick="testExcelExample()">Test Excel Example 1</button>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        let consoleLogs = [];
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        // Capture console logs
+        console.log = function(...args) {
+            consoleLogs.push({type: 'log', args: args, time: new Date().toISOString()});
+            originalLog.apply(console, args);
+        };
+        
+        console.error = function(...args) {
+            consoleLogs.push({type: 'error', args: args, time: new Date().toISOString()});
+            originalError.apply(console, args);
+        };
+        
+        console.warn = function(...args) {
+            consoleLogs.push({type: 'warn', args: args, time: new Date().toISOString()});
+            originalWarn.apply(console, args);
+        };
+        
+        function checkJSErrors() {
+            const errors = [];
+            window.addEventListener('error', (e) => {
+                errors.push({
+                    message: e.message,
+                    filename: e.filename,
+                    lineno: e.lineno,
+                    colno: e.colno
+                });
+            });
+            
+            setTimeout(() => {
+                const div = document.getElementById('jsErrors');
+                if (errors.length > 0) {
+                    div.innerHTML = '<div class="error-box"><strong>JavaScript Errors Found:</strong><pre>' + 
+                        JSON.stringify(errors, null, 2) + '</pre></div>';
+                } else {
+                    div.innerHTML = '<div class="success-box">No JavaScript errors detected!</div>';
+                }
+            }, 1000);
+        }
+        
+        async function testDataLoading() {
+            const div = document.getElementById('dataStatus');
+            div.innerHTML = '<p>Loading data...</p>';
+            
+            try {
+                if (typeof loadData === 'function') {
+                    await loadData();
+                    div.innerHTML = '<div class="success-box">✅ Data loaded successfully!</div>';
+                } else {
+                    div.innerHTML = '<div class="error-box">❌ loadData function not found!</div>';
+                }
+            } catch (error) {
+                div.innerHTML = '<div class="error-box"><strong>Error loading data:</strong><pre>' + 
+                    error.message + '\n' + error.stack + '</pre></div>';
+            }
+        }
+        
+        async function testFormSubmission() {
+            const div = document.getElementById('formTest');
+            div.innerHTML = '<p>Testing form submission...</p>';
+            
+            try {
+                // Test with South Telangana example
+                const testData = {
+                    crop: 'PADDY',
+                    location: 'SOUTH TELENGANA',
+                    season: 'Rabi',
+                    fieldType: 'Irrigated',
+                    nitrogen: 0.5, // Medium N
+                    phosphorus: 0.25, // Low P
+                    potassium: 0.3, // High K
+                    organicCarbon: 0.5,
+                    sulfur: 0,
+                    ph: 7,
+                    gromorCombination: '28-28-0',
+                    soilType: 'Red',
+                    ec: 0,
+                    calcium: 0,
+                    magnesium: 0,
+                    zinc: 0,
+                    boron: 0,
+                    manganese: 0,
+                    iron: 0,
+                    copper: 0,
+                    molybdenum: 0,
+                    chlorine: 0,
+                    preferences: {}
+                };
+                
+                if (typeof calculateRecommendations === 'function') {
+                    const results = calculateRecommendations(testData);
+                    div.innerHTML = '<div class="success-box"><strong>✅ Form submission test passed!</strong><pre>' + 
+                        JSON.stringify(results, null, 2).substring(0, 1000) + '...</pre></div>';
+                } else {
+                    div.innerHTML = '<div class="error-box">❌ calculateRecommendations function not found!</div>';
+                }
+            } catch (error) {
+                div.innerHTML = '<div class="error-box"><strong>Error in form submission:</strong><pre>' + 
+                    error.message + '\n' + error.stack + '</pre></div>';
+            }
+        }
+        
+        function captureConsoleLogs() {
+            const div = document.getElementById('consoleLogs');
+            const recentLogs = consoleLogs.slice(-50); // Last 50 logs
+            
+            let html = '<div class="success-box"><strong>Recent Console Logs (last 50):</strong><pre>';
+            recentLogs.forEach(log => {
+                html += `[${log.time}] ${log.type.toUpperCase()}: ${log.args.map(a => 
+                    typeof a === 'object' ? JSON.stringify(a) : String(a)
+                ).join(' ')}\n`;
+            });
+            html += '</pre></div>';
+            
+            div.innerHTML = html;
+        }
+        
+        async function testExcelExample() {
+            const div = document.getElementById('excelComparison');
+            div.innerHTML = '<p>Testing Excel Example 1...</p>';
+            
+            try {
+                const testData = {
+                    crop: 'PADDY',
+                    location: 'SOUTH TELENGANA',
+                    season: 'Rabi',
+                    fieldType: 'Irrigated',
+                    nitrogen: 0.5, // Medium N
+                    phosphorus: 0.25, // Low P
+                    potassium: 0.3, // High K
+                    organicCarbon: 0.5,
+                    sulfur: 0,
+                    ph: 7,
+                    gromorCombination: '28-28-0',
+                    soilType: 'Red',
+                    ec: 0,
+                    calcium: 0,
+                    magnesium: 0,
+                    zinc: 0,
+                    boron: 0,
+                    manganese: 0,
+                    iron: 0,
+                    copper: 0,
+                    molybdenum: 0,
+                    chlorine: 0,
+                    preferences: {}
+                };
+                
+                if (typeof calculateRecommendations === 'function') {
+                    await loadData();
+                    const results = calculateRecommendations(testData);
+                    
+                    // Calculate totals
+                    let totalN = 0, totalP = 0, totalK = 0, totalS = 0;
+                    if (results.recommendations) {
+                        results.recommendations.forEach(stage => {
+                            if (stage && stage.fertilizers) {
+                                stage.fertilizers.forEach(fert => {
+                                    totalN += fert.nContributed || 0;
+                                    totalP += fert.pContributed || 0;
+                                    totalK += fert.kContributed || 0;
+                                    totalS += fert.sContributed || 0;
+                                });
+                            }
+                        });
+                    }
+                    
+                    const expected = {N: 51.2, P: 33, K: 12, S: 6.5};
+                    const actual = {N: totalN.toFixed(1), P: totalP.toFixed(1), K: totalK.toFixed(1), S: totalS.toFixed(1)};
+                    
+                    let html = '<div><strong>Excel Example 1 Comparison:</strong><br>';
+                    html += '<strong>Expected:</strong> N=' + expected.N + ', P=' + expected.P + ', K=' + expected.K + ', S=' + expected.S + '<br>';
+                    html += '<strong>Actual:</strong> N=' + actual.N + ', P=' + actual.P + ', K=' + actual.K + ', S=' + actual.S + '<br>';
+                    
+                    const diffN = Math.abs(parseFloat(expected.N) - parseFloat(actual.N));
+                    const diffP = Math.abs(parseFloat(expected.P) - parseFloat(actual.P));
+                    const diffK = Math.abs(parseFloat(expected.K) - parseFloat(actual.K));
+                    
+                    if (diffN < 2 && diffP < 2 && diffK < 2) {
+                        html += '<div class="success-box">✅ Results are close to expected values!</div>';
+                    } else {
+                        html += '<div class="error-box">⚠️ Results differ from expected values. Differences: N=' + diffN.toFixed(1) + ', P=' + diffP.toFixed(1) + ', K=' + diffK.toFixed(1) + '</div>';
+                    }
+                    
+                    html += '<pre>' + JSON.stringify(results, null, 2).substring(0, 2000) + '...</pre></div>';
+                    div.innerHTML = html;
+                } else {
+                    div.innerHTML = '<div class="error-box">❌ calculateRecommendations function not found!</div>';
+                }
+            } catch (error) {
+                div.innerHTML = '<div class="error-box"><strong>Error testing Excel example:</strong><pre>' + 
+                    error.message + '\n' + error.stack + '</pre></div>';
+            }
+        }
+        
+        // Auto-run checks on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                checkJSErrors();
+                testDataLoading();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+

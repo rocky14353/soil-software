@@ -1,0 +1,21 @@
+,,,,
+,,,,
+,,,,
+Soil Fertility Status Table,,Soil Type  :,Loam ,
+S.No,Name of the parameter,Measured Unit ,Test Value,Classification/Rating
+1,Soil pH,0 -14,7.3,Neutral
+2,Soil Electrical conductivity(EC),dS/m,2,Critical for germination
+3,Organic Carbon  (OC),%,0.4,Low
+4,Nitrogen (N),Kgs/Acre,140,Medium
+5,Phosphorus (P2O5),Kgs/Acre,30,High
+6,Potassium (K2O),Kgs/Acre,100,Medium
+7,Sulphur,ppm,9,low
+8,Calcium,cmol/Kg,2,Sufficiency
+9,Magnesium,cmol/Kg,0.9,Deficiency
+10,Zinc (Zn),ppm,1,Deficiency
+11,Iron (Fe),ppm,20,Sufficiency
+12,Manganese (Mn),ppm,3,Deficiency
+13,Copper (Cu),ppm,0.5,Sufficiency
+14,Boron (B),ppm,0.4,Deficiency
+15,Molybdenum (Mo),ppm,0.1,Deficiency
+16,Chlorine,ppm,,

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Up Pass Test - SOUTH TELENGANA</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .stage { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .stage h3 { margin-top: 0; color: #333; }
+        .nutrient { margin: 10px 0; padding: 8px; background: #f5f5f5; border-radius: 3px; }
+        .fertilizer { margin: 5px 0; padding: 5px; background: #e8f4f8; }
+        .summary { margin: 20px 0; padding: 15px; background: #e8f5e9; border-radius: 5px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Top-Up Pass Test - SOUTH TELENGANA Regression Case</h1>
+    <div id="output"></div>
+    
+    <script src="script.js"></script>
+    <script>
+        // Load test payload
+        fetch('test-payload.json')
+            .then(response => response.json())
+            .then(payload => {
+                console.log('Test payload loaded:', payload);
+                
+                // Calculate recommendations
+                const result = calculateRecommendations(payload);
+                
+                // Display results
+                const outputDiv = document.getElementById('output');
+                let html = '<div class="summary">';
+                html += '<h2>Summary</h2>';
+                html += '<p><strong>Selected Combination:</strong> ' + (result.selectedCombination || 'N/A') + '</p>';
+                
+                // Calculate totals
+                let totalN = 0, totalP = 0, totalK = 0;
+                let totalNRequired = 0, totalPRequired = 0, totalKRequired = 0;
+                
+                if (result.stageRecommendations) {
+                    result.stageRecommendations.forEach((stage, idx) => {
+                        const stageN = stage.fertilizers.reduce((s, f) => s + (f.nContributed || 0), 0);
+                        const stageP = stage.fertilizers.reduce((s, f) => s + (f.pContributed || 0), 0);
+                        const stageK = stage.fertilizers.reduce((s, f) => s + (f.kContributed || 0), 0);
+                        totalN += stageN;
+                        totalP += stageP;
+                        totalK += stageK;
+                    });
+                }
+                
+                if (result.totalRequirements) {
+                    totalNRequired = result.totalRequirements.n || 0;
+                    totalPRequired = result.totalRequirements.p || 0;
+                    totalKRequired = result.totalRequirements.k || 0;
+                }
+                
+                const nDeficit = totalNRequired - totalN;
+                const pDeficit = totalPRequired - totalP;
+                const kDeficit = totalKRequired - totalK;
+                
+                html += '<table>';
+                html += '<tr><th>Nutrient</th><th>Required</th><th>Delivered</th><th>Deficit</th><th>Status</th></tr>';
+                html += `<tr><td>N</td><td>${totalNRequired.toFixed(2)}</td><td>${totalN.toFixed(2)}</td><td>${nDeficit.toFixed(2)}</td><td>${nDeficit < 1 ? '<span class="success">✓ Good</span>' : '<span class="error">✗ Needs improvement</span>'}</td></tr>`;
+                html += `<tr><td>P</td><td>${totalPRequired.toFixed(2)}</td><td>${totalP.toFixed(2)}</td><td>${pDeficit.toFixed(2)}</td><td>${pDeficit < 0.5 ? '<span class="success">✓ Good</span>' : '<span class="error">✗ Needs improvement</span>'}</td></tr>`;
+                html += `<tr><td>K</td><td>${totalKRequired.toFixed(2)}</td><td>${totalK.toFixed(2)}</td><td>${kDeficit.toFixed(2)}</td><td>${kDeficit < 0.5 ? '<span class="success">✓ Good</span>' : '<span class="error">✗ Needs improvement</span>'}</td></tr>`;
+                html += '</table>';
+                html += '</div>';
+                
+                // Display stage-wise breakdown
+                if (result.stageRecommendations) {
+                    result.stageRecommendations.forEach((stage, idx) => {
+                        const stageN = stage.fertilizers.reduce((s, f) => s + (f.nContributed || 0), 0);
+                        const stageP = stage.fertilizers.reduce((s, f) => s + (f.pContributed || 0), 0);
+                        const stageK = stage.fertilizers.reduce((s, f) => s + (f.kContributed || 0), 0);
+                        
+                        html += `<div class="stage">`;
+                        html += `<h3>${stage.stage || `Stage ${idx + 1}`}</h3>`;
+                        html += `<div class="nutrient"><strong>N:</strong> ${stageN.toFixed(2)} kg</div>`;
+                        html += `<div class="nutrient"><strong>P:</strong> ${stageP.toFixed(2)} kg</div>`;
+                        html += `<div class="nutrient"><strong>K:</strong> ${stageK.toFixed(2)} kg</div>`;
+                        
+                        // Validation
+                        if (idx === 1 && stageK > 0.01) {
+                            html += `<div class="error">ERROR: Tillering K must be 0, but got ${stageK.toFixed(2)}</div>`;
+                        }
+                        if (idx === 2 && stageP > 0.01) {
+                            html += `<div class="error">ERROR: Panicle P must be 0, but got ${stageP.toFixed(2)}</div>`;
+                        }
+                        
+                        html += `<h4>Fertilizers:</h4>`;
+                        stage.fertilizers.forEach(fert => {
+                            html += `<div class="fertilizer">${fert.name}: ${fert.kgs.toFixed(2)} kg (N: ${(fert.nContributed || 0).toFixed(2)}, P: ${(fert.pContributed || 0).toFixed(2)}, K: ${(fert.kContributed || 0).toFixed(2)})</div>`;
+                        });
+                        html += `</div>`;
+                    });
+                }
+                
+                outputDiv.innerHTML = html;
+            })
+            .catch(error => {
+                document.getElementById('output').innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+                console.error('Error:', error);
+            });
+    </script>
+</body>
+</html>
+
+
+
+
+
+

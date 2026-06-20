@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Regression: South Telengana Baseline</title>
+    <script src="script.js"></script>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #eee; }
+        h1 { color: #7ec8e3; }
+        .pass { color: #4caf50; }
+        .fail { color: #f44336; }
+        .warn { color: #ff9800; }
+        .section { margin: 18px 0; padding: 14px; background: #2a2a2a; border-radius: 6px; border-left: 4px solid #555; }
+        .section.ok  { border-left-color: #4caf50; }
+        .section.bad { border-left-color: #f44336; }
+        pre { margin: 6px 0; }
+        #summary { font-size: 1.2em; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Regression Test — SOUTH TELENGANA Baseline</h1>
+
+    <!-- Mock form: satisfies calculateRecommendations' DOM query for pref_* inputs -->
+    <!-- Uses the exact input names from index.html, hidden so they don't appear on screen -->
+    <form id="soilTestForm" style="display:none">
+        <input type="hidden" name="pref_28-28-0"  value="Optional">
+        <input type="hidden" name="pref_14-35-14" value="Optional">
+        <input type="hidden" name="pref_20-20-0"  value="Optional">
+        <input type="hidden" name="pref_10-26-26" value="Optional">
+        <input type="hidden" name="pref_16-20-0"  value="Optional">
+        <input type="hidden" name="pref_Urea"     value="Optional">
+        <input type="hidden" name="pref_MOP"      value="Optional">
+        <input type="hidden" name="pref_SOP"      value="Optional">
+        <input type="hidden" name="pref_SSP"      value="Optional">
+    </form>
+
+    <div id="output"></div>
+    <div id="summary"></div>
+
+    <script>
+    // ── Baseline payload (frozen) ─────────────────────────────────────────────
+    const PAYLOAD = {
+        crop: "Paddy lowland",
+        organicCarbon: 0.6,
+        nitrogen: 150,
+        phosphorus: 9,
+        potassium: 50,
+        season: "Rabi",
+        fieldType: "Irrigated",
+        location: "SOUTH TELENGANA",
+        soilType: "Medium",
+        sulfur: 9,
+        ph: 7.5,
+        ec: 0.6,
+        calcium: 20,
+        magnesium: 50,
+        zinc: 5,
+        boron: 0.5,
+        manganese: 20,
+        iron: 50,
+        copper: 20,
+        molybdenum: 0.5,
+        chlorine: 9.8,
+        gromorCombination: "Auto-select based on Location"
+    };
+
+    // ── Assertion helpers ─────────────────────────────────────────────────────
+    let passed = 0, failed = 0;
+    const out = document.getElementById('output');
+
+    function assert(label, condition, details) {
+        const div = document.createElement('div');
+        div.className = 'section ' + (condition ? 'ok' : 'bad');
+        div.innerHTML = `<span class="${condition ? 'pass' : 'fail'}">${condition ? '✅ PASS' : '❌ FAIL'}</span>  ${label}` +
+                        (details ? `<pre>${details}</pre>` : '');
+        out.appendChild(div);
+        condition ? passed++ : failed++;
+    }
+
+    function assertClose(label, actual, expected, tol, details) {
+        const ok = Math.abs(actual - expected) <= tol;
+        assert(label, ok, `actual=${actual.toFixed(3)}  expected=${expected}  tol=±${tol}` + (details ? `  (${details})` : ''));
+    }
+
+    // ── Async runner: awaits loadData() before calling calculateRecommendations ─
+    (async () => {
+        // Load all JSON data files first — without this, cropsData / locationCropRecommendations
+        // remain empty objects and calculateRecommendations throws "data not found".
+        try {
+            await loadData();
+        } catch (e) {
+            const div = document.createElement('div');
+            div.className = 'section bad';
+            div.innerHTML = `<span class="fail">❌ loadData() FAILED</span><pre>${e.message}\n${e.stack}</pre>`;
+            out.appendChild(div);
+            failed++;
+            writeSummary();
+            return;
+        }
+
+        // ── Run assertions ────────────────────────────────────────────────────
+        try {
+            const result = calculateRecommendations(PAYLOAD);
+            const recs   = result.recommendations;
+
+            // ── Derived per-stage targets from split ratios (avoids relying on expectedNPKPerStage) ──
+            const reqN = result.totals?.n || 0;
+            const reqK = result.totals?.k || 0;
+            const nRatios = result.splitRatios?.n || [];
+            const kRatios = result.splitRatios?.k || [];
+            const nStages = result.splitRatios?.nStages || [];
+            const kStages = result.splitRatios?.kStages || [];
+
+            // N targets align 1:1 with N stages.
+            const nTargets = nRatios.map(r => reqN * r);
+
+            // K targets must align to N stages: map K stage ratios onto each N stage name.
+            const kTargets = nStages.map(stageName => {
+                const kIdx = kStages.findIndex(s => s === stageName);
+                return kIdx >= 0 ? (reqK * (kRatios[kIdx] || 0)) : 0;
+            });
+
+            // ── Hard stage rules ─────────────────────────────────────────────
+            const stages = recs.map(s => {
+                const n = s.fertilizers.reduce((a, f) => a + (f.nContributed || 0), 0);
+                const p = s.fertilizers.reduce((a, f) => a + (f.pContributed || 0), 0);
+                const k = s.fertilizers.reduce((a, f) => a + (f.kContributed || 0), 0);
+                return { name: s.stage, n, p, k, fertilizers: s.fertilizers };
+            });
+
+            const tillering = stages[1];
+            const panicle   = stages[2];
+
+            assert('Tillering K = 0',
+                tillering && tillering.k < 0.01,
+                tillering ? `Tillering K = ${tillering.k.toFixed(3)} kg` : 'Tillering stage missing');
+
+            assert('Panicle P = 0',
+                panicle && panicle.p < 0.01,
+                panicle ? `Panicle P = ${panicle.p.toFixed(3)} kg` : 'Panicle stage missing');
+
+            assert('Exactly 3 stages',
+                recs.length === 3,
+                `Got ${recs.length} stage(s)`);
+
+            // ── No 0-kg fertilizer rows ───────────────────────────────────────
+            const zeroRows = [];
+            recs.forEach(s => s.fertilizers.forEach(f => {
+                if (f.kgs <= 0) zeroRows.push(`${s.stage}:${f.name}`);
+            }));
+            assert('No 0-kg fertilizer rows', zeroRows.length === 0, zeroRows.join(', ') || 'None');
+
+            // ── Global totals within 12% tolerance ───────────────────────────
+            const totN = stages.reduce((a, s) => a + s.n, 0);
+            const totP = stages.reduce((a, s) => a + s.p, 0);
+            const totK = stages.reduce((a, s) => a + s.k, 0);
+            const reqN = result.totals.n, reqP = result.totals.p, reqK = result.totals.k;
+
+            assertClose('Global N within 12% of required', totN, reqN, reqN * 0.12, `req=${reqN}`);
+            assertClose('Global P within 12% of required', totP, reqP, reqP * 0.12, `req=${reqP}`);
+            assertClose('Global K within 12% of required', totK, reqK, reqK * 0.12, `req=${reqK}`);
+
+            // ── Stage leakage: no stage more than 12% above its derived N/K target ─────────
+            // We intentionally do NOT assert per-stage P targets here (no robust splitRatios.p).
+            stages.forEach((act, i) => {
+                const nT = nTargets[i];
+                const kT = kTargets[i];
+                if (nT > 0) {
+                    assert(`Stage ${i+1} (${act.name}) N ≤ target+12%`,
+                        act.n <= nT * 1.12 + 0.01,
+                        `delivered=${act.n.toFixed(2)}  target=${nT.toFixed(2)}`);
+                }
+                if (kT > 0) {
+                    assert(`Stage ${i+1} (${act.name}) K ≤ target+12%`,
+                        act.k <= kT * 1.12 + 0.01,
+                        `delivered=${act.k.toFixed(2)}  target=${kT.toFixed(2)}`);
+                }
+            });
+
+            // ── Label format check (no "kgs", no "bag(s)") ───────────────────
+            const badLabels = [];
+            recs.forEach(s => s.fertilizers.forEach(f => {
+                if (f.label && (f.label.includes('kgs') || f.label.includes('bag(s)')))
+                    badLabels.push(`${s.stage}:${f.name} → "${f.label}"`);
+            }));
+            assert('No "kgs" or "bag(s)" in labels', badLabels.length === 0, badLabels.join('\n') || 'All clean');
+
+            // ── Dump stage detail ─────────────────────────────────────────────
+            const detail = document.createElement('div');
+            detail.className = 'section';
+            let txt = '<b>Stage-wise output:</b>\n';
+            stages.forEach((s, i) => {
+                txt += `\n${s.name}:\n` +
+                       `  N=${s.n.toFixed(2)} kg` + (nTargets[i] != null ? ` (target ${nTargets[i].toFixed(2)})` : '') +
+                       `  P=${s.p.toFixed(2)} kg` +
+                       `  K=${s.k.toFixed(2)} kg` + (kTargets[i] != null ? ` (target ${kTargets[i].toFixed(2)})` : '') + '\n';
+                s.fertilizers.forEach(f => {
+                    txt += `  - ${f.name}: ${f.label || f.kgs + ' kg'}\n`;
+                });
+            });
+            txt += `\nGlobal: N=${totN.toFixed(2)}/${reqN}  P=${totP.toFixed(2)}/${reqP}  K=${totK.toFixed(2)}/${reqK}`;
+            detail.innerHTML = `<pre>${txt}</pre>`;
+            out.appendChild(detail);
+
+        } catch (e) {
+            const div = document.createElement('div');
+            div.className = 'section bad';
+            div.innerHTML = `<span class="fail">❌ EXCEPTION</span><pre>${e.message}\n${e.stack}</pre>`;
+            out.appendChild(div);
+            failed++;
+        }
+
+        writeSummary();
+    })();
+
+    function writeSummary() {
+        const sumDiv = document.getElementById('summary');
+        const allOk  = failed === 0;
+        sumDiv.innerHTML = `<span class="${allOk ? 'pass' : 'fail'}" style="font-size:1.3em">
+            ${allOk ? '✅ ALL TESTS PASSED' : '❌ FAILURES DETECTED'}
+            — ${passed} passed, ${failed} failed
+        </span>`;
+    }
+    </script>
+</body>
+</html>

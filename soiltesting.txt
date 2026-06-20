@@ -1,0 +1,1874 @@
+1.0 INTRODUCTION
+1.1
+
+System Overview
+
+What is a Soil Test?
+A soil test is a process by which elements (phosphorus, potassium,
+calcium, magnesium, sodium, sulfur, manganese, copper and zinc) are
+chemically removed from the soil and measured for their "plant
+available" content within the sample. The quantity of available
+nutrients in the sample determines the amount of fertilizer that is
+recommended. A soil test also measures soil pH, humic matter and
+exchangeable acidity. These analyses indicate whether lime is needed
+and, if so, how much to apply
+
+Why Do You Need A Soil Test?
+Encourages plant growth by providing the best lime and fertilizer
+recommendations.
+When growers guess about the need for lime or fertilizers, too little or
+too much is likely to be applied. By using a soil test report, the grower
+does not need to guess.
+For Example: When applying too much lime, soil pH may rise above
+the needed level, which causes nutrients such as iron, manganese,
+boron, copper and zinc to become less available to plants. It is also
+common to see homeowners purchase one bag of lime when they
+purchase one bag of fertilizer. Based on an average lawn size of 5000
+square feet, one bag of fertilizer may be enough. Applying one bag of
+lime over 5000 square feet, however, will have little effect on soil pH.
+
+Diagnoses whether there is too little or too much of a nutrient.
+Promotes environmental quality.
+When gardeners apply only as much fertilizer as is
+necessary, nutrient runoff into surface or ground water is
+minimized and natural resources are conserved.
+Saves money that might otherwise be spent on unneeded
+lime and fertilizer.
+For example, growers of flue-cured tobacco often
+routinely apply phosphorus. In areas where soil levels are
+high in phosphorus, a soil test could save these farmers up
+to 3000 per acre.
+Sample each unique area separately.
+Each sample should represent only one soil type or area—for example,
+a lawn, vegetable garden or perennial landscaped area (Figure 1). For
+each unique area, take at least six to eight sub samples and combine
+them to make one sample. If one area of your yard seems healthy and
+another has bare or yellow areas, sample healthy and unhealthy areas
+separately even if both are lawn grasses or flower gardens, etc.
+
+System Background, Objectives and Scope :
+The
+
+project
+
+is
+
+entitled
+
+“SOIL
+
+TESTING
+
+SOFTWARE”
+
+Coromendal Fertilisers, Hyderabad is a client-server application which
+helps to handle the operations of the Soil testing easily. It is very
+tedious job if it operated manually by maintaining books. The
+authorities will take a report every month for providing necessary
+information according to their Samples Collected. The work will be
+very fast if they had a utility, which can provide him all the activity,
+which they have to do for creating reports.
+
+2.0 SYSTEM OPERATING ENVIRONMENT
+2.1 Hardware & Software requirement
+Hardware Specifications:
+This system has been developed on the following hardware
+configuration.
+1. Pentium IV Processor
+2.256 MB RAM
+3.512 KB Cache Memory
+4. Hard disk with a capacity of 40 GB
+5. Microsoft Compatible 101 or more Key Board
+Software Specifications:
+This system has been developed using the following
+software.
+Operating System
+Back End
+
+: Microsoft Windows XP, 2000,NT
+:SQLSERVER2000
+
+Front End
+
+: Core java, JSP, Servlets, HTML
+
+Database Connectivity
+
+: JDBC
+
+2.3 Support Software Environment
+The special software that has been used for the support of
+this system is SQLSERVER2000. SQLSever2000 is used to view
+the database tables and data easily without writing the queries.
+We can easily create tables using this software and also can
+easily make the changes, if any, for the database.
+
+Data Dictionary
+Data dictionaries are integral component of structured analysis,
+since date flow diagrams by themselves not fully describes the subject
+of
+
+the
+
+investigation.
+
+The
+
+data
+
+dictionary
+
+provides
+
+additional
+
+information about the system. A data dictionary is a catalog repository
+provides additional information about the system.
+A data dictionary is a catalog – a repository – of the elements in
+system. In a data dictionary we will find a list of all the elements
+composing the data flow through a system. The major elements are
+data flows, data stores and process. The data dictionary stores details
+and descriptions of those elements.
+Analysis use data dictionaries for five important reasons
+
+
+
+To manage the details in large systems.
+
+
+
+To communicate a common meaning for all system elements.
+
+
+
+To document the feature of the system.
+
+
+
+To facilitate analysis of the details in order to evaluate
+Characteristics and determine where system changes should be
+made.
+
+
+
+To locate errors and omissions in the system.
+
+1. Table Name: analysis_master
+Column Name
+Id
+Crop _type
+Dist
+Season
+
+Data type
+Bright
+int
+int
+Varchar
+
+Length
+8
+4
+4
+20
+
+source_type
+N
+P
+K
+S
+State
+
+Varchar
+Int
+Int
+Int
+Int
+Int
+
+50
+4
+4
+4
+4
+4
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+2. Table Name: bo_master
+Column Name
+Id
+Name
+Low
+High
+Tname
+Vname
+
+3. Table Name: branch_master
+Column Name
+Id
+Name
+Sid
+Address
+Teladdress
+Oriya_address
+
+Data type
+int
+varchar
+Int
+varchar
+nvarchar
+nvarchar
+
+Length
+4
+80
+4
+255
+1000
+1000
+
+Data type
+int
+varchar
+
+Length
+4
+50
+
+4. Table Name: brand
+Column Name
+Id
+Name
+
+5 .Table Name: brand_master
+
+Column Name
+Id
+Name
+
+Data type
+int
+varchar
+
+Length
+4
+60
+
+6. Table Name: ca_master
+Column Name
+Id
+Name
+Low
+High
+Tname
+Oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+7. Table Name: chemical_master
+Column Name
+Id
+Name
+
+Data type
+int
+varchar
+
+Length
+4
+50
+
+8. Table Name: chlorine_master
+
+Column Name
+Id
+Name
+Low
+High
+Tname
+Oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+9. Table Name: company_master
+Column Name
+Id
+Name
+
+Data type
+int
+varchar
+
+Length
+4
+50
+
+10. Table Name: crop1_master
+
+Column Name
+Id
+Name
+nosplit
+N1
+N2
+N3
+N4
+Tame
+
+Data type
+Int
+varchar
+Int
+varchar
+Data type
+Int
+varchar
+nvarchar
+
+Length
+8
+100
+4
+500
+Length
+8
+100
+1000
+
+oriya_name
+Column Name
+Id
+Name
+Tame
+oriya_name
+Name
+Id
+Name
+Tame
+oriya_name
+
+varchar
+Data type
+Int
+varchar
+nvarchar
+varchar
+Data type
+Int
+varchar
+nvarchar
+varchar
+
+500
+Length
+8
+100
+1000
+500
+Length
+8
+100
+1000
+500
+
+11. Table Name: crop_master
+Column Name
+Id
+Name
+Nosplit
+N1
+N2
+N3
+N4
+N5
+K1
+K2
+K3
+K4
+K5
+Repheader1
+Repheader2
+Repheader3
+Repheader4
+repheader5
+Noseasons
+combproductnames
+Sourcetype
+Th1
+Th2
+Th3
+Th4
+Th5
+oh1
+oh2
+oh3
+
+Data type
+int
+varchar
+Int
+float
+float
+float
+float
+float
+float
+float
+float
+float
+float
+Varchar
+Varchar
+Varchar
+Varchar
+Varchar
+Varchar
+Varchar
+Varchar
+nvarchar
+nvarchar
+nvarchar
+nvarchar
+nvarchar
+nvarchar
+nvarchar
+nvarchar
+
+Length
+8
+100
+4
+8
+8
+8
+8
+8
+8
+8
+8
+8
+8
+255
+255
+255
+255
+255
+50
+100
+30
+700
+700
+700
+700
+700
+500
+500
+500
+
+oh4
+oh5
+
+nvarchar
+nvarchar
+
+500
+500
+
+12. Table Name: cropfertiliser
+Column Name
+Sno
+Crop
+Split
+Season
+Gromorgrades
+Ts
+Operator
+Cropsourcetype
+
+Data type
+bright
+int
+varchar
+varchar
+varchar
+datetime
+varchar
+varchar
+
+Length
+8
+4
+100
+50
+255
+8
+100
+50
+
+13. Table Name: cu_master
+Column Name
+Id
+Name
+Low
+High
+Tname
+Oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+14. Table Name: dist_master
+Column Name
+Sid
+Distid
+Distname
+
+Data type
+int
+int
+varchar
+
+Length
+4
+4
+50
+
+15. Table Name: elec_cond_master
+Column Name
+Id
+Name
+Low
+High
+Soil_type
+Tname
+Oname
+
+Data type
+int
+varchar
+float
+float
+Varchar
+nvarchar
+varchar
+
+16. Table Name: fe_master
+
+Length
+4
+50
+8
+8
+20
+700
+500
+
+Column Name
+Id
+Name
+Low
+High
+Tname
+Oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+17. Table Name: fertiliser
+Column Name
+Sno
+Previouscrop
+Previousvariety
+Previousseason
+previousyieldinqt
+Oname
+
+Data type
+bright
+Int
+varchar
+varchar
+nvarchar
+varchar
+
+Length
+8
+4
+100
+50
+700
+500
+
+18. Table Name: formula_master
+Column Name
+nlow
+nhigh
+plow
+phigh
+klow
+khigh
+slow
+shigh
+
+Data type
+float
+float
+float
+float
+float
+float
+float
+float
+
+Length
+8
+8
+8
+8
+8
+8
+8
+8
+
+19. Table Name: grade_master
+Column Name
+Id
+Name
+N
+P
+K
+
+Data type
+Int
+varchar
+int
+int
+int
+
+Length
+4
+50
+4
+4
+4
+
+20. Table Name: lastfertiliser
+Column Name
+sno
+lastyear
+
+Data type
+bright
+int
+
+Length
+8
+4
+
+lastmonth
+lastgrades
+lastbrand
+lastcompany
+lastcrop
+lastqt
+ts
+operator
+
+int
+varchar
+varchar
+varchar
+varchar
+float
+datetime
+varchar
+
+4
+255
+100
+100
+255
+8
+100
+100
+
+21. Table Name: lastyearfertiliser
+Column Name
+sno
+lastyearseason
+Lastyear1
+lastyearcrop
+lastyeartime
+lastyeargrades
+lastyearbrand
+lastyearcompany
+lastyearacre
+ts
+operator
+
+Data type
+bright
+varchar
+int
+int
+varchar
+varchar
+varchar
+varchar
+float
+datetime
+varchar
+
+Length
+8
+100
+4
+4
+50
+255
+100
+100
+8
+8
+100
+
+22. Table Name: mandal_master
+Column Name
+sid
+distid
+mandalid
+mandalname
+
+Data type
+int
+int
+int
+varchar
+
+Length
+4
+4
+4
+50
+
+23. Table Name: mg_master
+
+Column Name
+id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+24. Table Name: mn_master
+Column Name
+id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+25. Table Name: mo_master
+Column Name
+id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+26. Table Name: nitrogen_master
+Column Name
+Id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+27. Table Name: org_carbon_master
+Column Name
+id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+28. Table Name: ph_master
+
+Length
+4
+50
+8
+8
+700
+500
+
+Column Name
+id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+50
+8
+8
+700
+500
+
+29. Table Name: ph_recomodation
+Column Name
+id
+phlow
+phhigh
+soiltype
+recomdation
+telrecomda
+orirecomda
+
+Data type
+int
+float
+float
+varchar
+nvarchar
+nvarchar
+varchar
+
+Length
+4
+8
+8
+50
+700
+4000
+500
+
+30. Table Name: phosphorus_master
+Column Name
+id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+30
+8
+8
+700
+500
+
+31. Table Name: potassium_master
+Column Name
+Id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+30
+8
+8
+700
+500
+
+32. Table Name: prod_master
+Column Name
+Id
+name
+
+Data type
+int
+varchar
+
+Length
+4
+70
+
+N
+P
+K
+S
+
+int
+int
+int
+int
+
+4
+4
+4
+4
+
+33. Table Name: product_master
+Column Name
+Id
+name
+N
+P
+K
+S
+tel
+oriya
+
+Data type
+int
+varchar
+int
+int
+int
+int
+nvarchar
+varchar
+
+Length
+4
+255
+4
+4
+4
+4
+500
+255
+
+Data type
+nvarchar
+Float
+float
+float
+float
+float
+float
+float
+float
+float
+float
+float
+nvarchar
+nvarchar
+float
+float
+float
+float
+nvarchar
+nvarchar
+
+Length
+255
+8
+4
+4
+4
+4
+4
+4
+4
+4
+4
+4
+255
+255
+4
+4
+4
+4
+255
+255
+
+nvarchar
+
+255
+
+34. Table Name: Rabi
+Column Name
+cropname
+splits
+n1
+n2
+n
+n4
+n5
+k1
+k2
+k3
+k4
+k5
+Stage1
+Stage2
+Stage3
+Stage4
+Stage4
+Stage5
+[NoOf Seasons]
+[combnation
+product]
+sourcetype
+
+35. Table Name: recomtable
+
+Column Name
+id
+name
+cname
+recom
+trec
+orec
+
+Data type
+int
+varchar
+varchar
+varchar
+nvarchar
+nvarchar
+
+Length
+4
+50
+50
+300
+4000
+500
+
+36. Table Name: relationprod_master
+Column Name
+sno
+product
+Company
+grade
+
+Data type
+int
+int
+int
+int
+
+Length
+4
+4
+4
+4
+
+37. Table Name: Results
+Column Name
+cropname
+splits
+n1
+n2
+n
+n4
+n5
+k1
+k2
+k3
+k4
+k5
+Stage1
+Stage2
+Stage3
+Stage4
+Stage4
+Stage5
+[NoOf Seasons]
+[combnation
+product]
+sourcetype
+
+Data type
+nvarchar
+Float
+float
+float
+float
+float
+float
+float
+float
+float
+float
+float
+nvarchar
+nvarchar
+float
+float
+float
+float
+nvarchar
+nvarchar
+
+Length
+255
+8
+4
+4
+4
+4
+4
+4
+4
+4
+4
+4
+255
+255
+4
+4
+4
+4
+255
+255
+
+nvarchar
+
+255
+
+38. Table Name: soiltest
+Column Name
+Sno
+branch
+farmername
+fathername
+state
+distic
+mandal
+village
+pincode
+phonecode
+phonenumber
+mobile
+email
+areafield
+surveyno
+topography
+soiltype
+drinage
+specialsoil
+irrigationrain
+irrigation
+numbermarked
+samplecollect
+Design
+collectdate
+receivedate
+phvalue
+ec
+Oc
+N
+P2o5
+K20
+S
+analysisdate
+analyzedby
+Ts
+operator
+Zn
+bo
+fe
+ca
+mo
+
+Data type
+Bright
+varchar
+varchar
+varchar
+int
+int
+int
+int
+Bright
+Bright
+Bright
+bright
+nvarchar
+float
+varchar
+varchar
+varchar
+varchar
+varchar
+varchar
+varchar
+varchar
+varchar
+varchar
+datetime
+datetime
+float
+float
+float
+float
+float
+float
+float
+datetime
+Varchar
+datetime
+varchar
+float
+float
+float
+float
+float
+
+Length
+4
+150
+150
+150
+4
+4
+4
+4
+4
+4
+4
+4
+100
+100
+10
+12
+10
+10
+500
+50
+100
+30
+150
+150
+8
+8
+8
+8
+8
+8
+8
+8
+8
+255
+8
+150
+100
+8
+8
+8
+8
+8
+
+mg
+mn
+cu
+
+float
+float
+float
+
+8
+8
+8
+
+39. Table Name: state_master
+Column Name
+Sid
+State name
+Ts
+
+Data type
+int
+varchar
+datetime
+
+Length
+4
+50
+8
+
+40. Table Name: sulphur_master
+Column Name
+id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+30
+8
+8
+700
+500
+
+41. Table Name: user_master
+Column Name
+id
+name
+usaerid
+Password
+type
+branch
+ts
+
+Data type
+int
+varchar
+varchar
+varchar
+varchar
+varchar
+datetime
+
+Length
+4
+100
+50
+50
+20
+100
+8
+
+42. Table Name: village_master
+Column Name
+sid
+distic
+mandalid
+villageid
+villagename
+
+Data type
+int
+bright
+bright
+bright
+varchar
+
+Length
+4
+8
+8
+8
+100
+
+43. Table Name: zn_master
+Column Name
+id
+name
+low
+high
+tname
+oname
+
+Data type
+int
+varchar
+float
+float
+nvarchar
+varchar
+
+Length
+4
+30
+8
+8
+700
+500
+
+Data Flow Diagrams
+Data Flow Diagram is a structure analysis tool that is used for
+graphical representation of Data processes through any organization.
+The data flow approach emphasis on the logic underlying the system,
+by using combination of only 4 symbols. It follows a top down
+approach. A full description of a system actually consists of set of DFD
+s, which comprises of various levels. And initial over view model is
+exploded lower level diagrams that show additional feature of the
+system. Further each process can be broken down into a more detailed
+DFD. This occurs repeatedly until sufficient details are described.
+DFD symbols
+Square
+
+it defines a source (originator ) or destination of system data.
+Arrow
+
+It indicates data flow-data in motion. It is a pipeline
+through which information flows.
+Circle or Bubble
+
+It represents a process that transforms incoming data flow(s) into
+outgoing data flow(s).
+
+Open Rectangle
+
+it is a data store-data at rest, or a temporary repository of data. Here I
+am giving only the Data Flow Diagram.
+
+3 Main Usecase Diagram
+
+Masters
+
+Information Sheet
+
+Operator
+Reports
+
+Identification of Actors:
+1. Primary Actor
+
+: Operator
+
+2. Secondary Actor : Administrator
+
+3.1.4 Sequence Diagram
+: Form/Report
+
+Data Base
+
+: Server
+
+Submit Details
+
+Send a query
+Insertion/M’fication
+Retrieval/Reporting
+
+Response of Qry
+
+Collabration Diagram
+
+Database
+USER
+
+1. Submit
+details to the
+form
+
+Form
+
+4. Retrieve
+reports
+
+2. Send a
+Query
+5. Response to Query
+
+Server
+
+3. Insert the
+data
+
+Access Control Mechanism
+Only authorized user can access the system through valid userid/password.
+
+Entry Forms
+Soil Testing Module contains the following entry forms:
+Master:
+
+State
+District
+Mandal
+Village
+Crop
+Analysis
+Splits
+Products
+Brand
+Product Relation
+Gromor Products
+pH Recommendation
+Nutrients Recommendation
+Bulk Data Updation
+
+
+
+Information Entry Form
+
+
+
+Reports
+
+
+
+Font Downloading
+
+
+
+User Creation
+
+Input Screens
+
+Here there are three type of Users are there
+1. Super Admin
+2. Admin
+3. User
+Once In 45 Days the System will intimate you to change the User
+name and password. The screen will be given below
+
+If Super Admin Login the Screen will be as shown below
+Home page of the Soil Testing Module
+
+In Super Admin the user Creations and the Master Updation and the
+reports and the file updations are all done in the Super Admin
+State Master: To Add New State to the database. Add the Name to
+the Textbox and submit it
+
+Master Edit Form: this form is used to edit the State master form
+
+After Editing the State name then update it or else if you want to
+delete it you can delete the state name.
+District Master: To Add a new District in the State. First select the
+state name in the combo box and then enter the district name in the
+below text box and submit it.
+
+Modify/Delete: To Modify or view the district form click on the modify
+button and you can get the screen as shown below
+
+The state and District name is already selected if you want to change
+the district name you can change it and Press Update button and if you
+want top delete it select and delete the district from the State.
+Mandal Entry Form:
+
+To add a new Mandal in the District. First select the state name in the
+State combo box and then Select the district name in the district
+combo box and enter the Mandal in the textbox and submit it.
+Mandal Edit/Delete
+
+The state, District and Mandal name is already selected if you want to
+change the mandal name you can change it and Press Update button
+and if you want to delete it select and delete the mandal from the
+Mandal form
+
+Village Entry Form: To add a new Village to a Mandal in the District.
+First select the state name in the State combo box and then select the
+district name in the district combo box select the mandal name and
+enter the Village in the textbox and submit it.
+
+Village Edit/Delete:
+
+The state, District, Mandal and village name is already selected if you
+want to change the village name you can change it and Press Update
+button and if you want to delete it select and delete the Village from
+the Village form
+Branch Entry Form: In the branch entry for the state name branch
+name address can be entered in the branch entry form.
+
+If you want to view the form the view form shows as shown below
+
+Here we can Edit/ Delete the Branch details from the master
+Company Entry Form: In the Company Entry form the company
+details are to be entered given below
+
+Product Entry Form:
+
+In the Product Entry form the Products are
+
+entered for a company
+
+Brand Entry Form: In the Brand entry form the brands are enterd
+for a company
+
+Product Combination Form: In the product combination form the
+company can be taken from the company combo and the product can
+be taken from the product combobox and the brand is taken from the
+brand combobox. And the relation can be shown as below
+
+Crops Entry Form: In the Crop Entry Form the Crop Names are
+entered.
+
+If we want to view the crop click on the view button and it’s shows as
+below
+
+Here after view the crop we can edit or Delete the crop the edit can be
+shown as below
+
+Once the crop data is submitted then we must click on the Analysis
+Menu there we must give the eatery to the crop to a particular area
+and the NPKS value to that particular area.
+Analysis Entry Form: In the Analysis Entry Form we must enter the
+crop name, State, district, Season: Kharif, Rabi, Summer, Perennial
+source: Irrigated, Rainfed and we must enter the Nitrogen Phosphorus
+Potassium and Sulphur values and submit it.
+
+If we want to do any Modification/ Delete the values from the Analysis
+master entry we can click on the View button this will be as shown
+below.
+
+Here we can edit/ Delete the Form.
+Split Entry Form: After Entering the Crop and their analysis we must
+entered the split of that crop. We must select the Crop name from the
+Crop list and the number of splits can be mentioned in the split
+textbox, Season: Kharif, Rabi, Summer, Perennial, combination of the
+Gromor Product (i.e.) Single Product, Double Product, Triple Product,
+Four Product , Source: Irrigated, Rainfed
+
+and the Heading to be given
+
+i.e. 30 Days, 45 Days etc. and we must declare the value how much
+dose can be add for Nitrogen and POTASSIUM. This is as shown below
+
+Gromor Product:
+
+Only we can Enter the Gromor Product to this form the Product and
+the NPKS values to the form and submit the form if we want to edit/
+delete the values of the product click on the view button and it is as
+shown below
+
+After view it if we want to Edit/ Delete the Form click on the Edit link if
+will appear as shown below then you can change the product name
+and the NPKS values and Update the Form.
+
+Nutrients Entry Form: In this we must enter the Nutrients Name and
+the High Medium and Low value of the Nutrients Can be added and
+submit it.
+
+If we want to add a new Nutrients click on the New Chemical.
+
+Before entering the Chemical name create the table in the SoilAnalysis
+Database and then add the Chemical name and submit it.
+
+If we add the values to the Nutrients i.e. pH, Nitrogen, Etc we must
+select it and we can entry the value to the Nutrients form if we click on
+the view button before clicking on it we must select the nutrient from
+the select box and click on the view button it appears as shown below.
+
+Here we can edit/ Delete the values like this there are 16 nutrients are
+there the same procedure can be applied to the entire one.
+pH Recommendation:
+In the Recommendation the pH High Low and depending upon the soil
+type
+
+the
+
+Recommendation
+
+are
+
+being
+
+selected
+
+from
+
+the
+
+pH
+
+Recommendation master. So we must add the details to the master
+and submit the form and if we want to view the form click on the view
+button and check the Recommendations and we can Edit/ Delete the
+pHRecommendation form.
+Nutrients Recommendations
+In the Nutrients Recommendation the Nutrients Name Crop name and
+the
+
+Recommendation
+
+are
+
+being
+
+selected
+
+from
+
+the
+
+Nutrients
+
+Recommendation master. So we must add the details to the master
+and submit the form and if we want to view the form click on the view
+button and check the Recommendations and we can Edit/ Delete the
+pHRecommendation form.
+
+Upload State Information:
+
+Font Download:
+
+

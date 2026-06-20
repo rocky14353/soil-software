@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soil Test - NPK Fertilizer Recommendation System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌾 Soil Test - NPK Fertilizer Recommendation System</h1>
+            <p class="subtitle">Coromandel Fertilisers Ltd. - Smart Fertilizer Recommendations</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Input Form Section -->
+            <section class="input-section">
+                <h2>Soil Test Input</h2>
+                <form id="soilTestForm">
+                    <!-- Required Fields -->
+                    <div class="form-group">
+                        <label for="crop">Crop <span class="required">*</span></label>
+                        <select id="crop" name="crop" required>
+                            <option value="">Select Crop</option>
+                            <option value="Paddy Upland">Paddy Upland</option>
+                            <option value="Paddy Mediumland">Paddy Mediumland</option>
+                            <option value="Paddy lowland">Paddy lowland</option>
+                            <option value="Maize">Maize</option>
+                            <option value="Jowar">Jowar</option>
+                            <option value="Fingermillet(Ragi)">Fingermillet (Ragi)</option>
+                            <option value="Cow Pea">Cow Pea</option>
+                            <option value="Redgram">Redgram</option>
+                            <option value="Soyabean">Soyabean</option>
+                            <option value="Groundnut">Groundnut</option>
+                            <option value="Mustard">Mustard</option>
+                            <option value="Sunflower">Sunflower</option>
+                            <option value="Sesamum">Sesamum</option>
+                            <option value="Castor">Castor</option>
+                            <option value="Niger">Niger</option>
+                            <option value="Jute">Jute</option>
+                            <option value="Sugarcane">Sugarcane</option>
+                            <option value="Wheat">Wheat</option>
+                            <option value="Betalvine">Betalvine</option>
+                            <option value="Ladiesfinger(Bhindi)">Ladiesfinger (Bhindi)</option>
+                            <option value="Brinjal">Brinjal</option>
+                            <option value="Sweet potato">Sweet potato</option>
+                            <option value="Pumpkin">Pumpkin</option>
+                            <option value="Spine gourd">Spine gourd</option>
+                            <option value="Gerkin(Coccinia)">Gerkin (Coccinia)</option>
+                            <option value="Pointed gourd">Pointed gourd</option>
+                            <option value="Onion">Onion</option>
+                            <option value="Chillie">Chillie</option>
+                            <option value="Garlic">Garlic</option>
+                            <option value="Ginger">Ginger</option>
+                            <option value="Turmeric">Turmeric</option>
+                            <option value="Tomato">Tomato</option>
+                            <option value="Cauliflower">Cauliflower</option>
+                            <option value="Cabbage">Cabbage</option>
+                            <option value="French bean">French bean</option>
+                            <option value="Pea">Pea</option>
+                            <option value="Carrot">Carrot</option>
+                            <option value="Radish">Radish</option>
+                            <option value="Capsicum">Capsicum</option>
+                            <option value="Pineapple">Pineapple</option>
+                            <option value="Potato">Potato</option>
+                            <!-- Additional crops from user requirements -->
+                            <option value="Bajra">Bajra</option>
+                            <option value="Korra">Korra</option>
+                            <option value="Variga">Variga</option>
+                            <option value="Green Gram">Green Gram</option>
+                            <option value="Black Gram">Black Gram</option>
+                            <option value="Bengal Gram">Bengal Gram</option>
+                            <option value="Saff Flower">Saff Flower</option>
+                            <option value="American Varieties/Cotton">American Varieties/Cotton</option>
+                            <option value="Desi Varieties/Cotton">Desi Varieties/Cotton</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="organicCarbon">Organic Carbon (%) <span class="required">*</span></label>
+                            <input type="number" id="organicCarbon" name="organicCarbon" step="0.01" min="0" max="5" placeholder="e.g., 0.4" required>
+                            <small style="color: #666;">Used for N classification</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="nitrogen">Nitrogen (kg/acre) <span class="required">*</span></label>
+                            <input type="number" id="nitrogen" name="nitrogen" step="0.1" min="0" placeholder="e.g., 140" required>
+                            <small style="color: #666;">Available soil N in kg/acre</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="phosphorus">Phosphorus P2O5 (kg/acre) <span class="required">*</span></label>
+                            <input type="number" id="phosphorus" name="phosphorus" step="0.1" min="0" placeholder="e.g., 30" required>
+                            <small style="color: #666;">Available soil P2O5 in kg/acre</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="potassium">Potassium K2O (kg/acre) <span class="required">*</span></label>
+                            <input type="number" id="potassium" name="potassium" step="0.1" min="0" placeholder="e.g., 100" required>
+                            <small style="color: #666;">Available soil K2O in kg/acre</small>
+                        </div>
+                    </div>
+
+                    <!-- Optional Fields -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="season">Season</label>
+                            <select id="season" name="season">
+                                <option value="">Select Season</option>
+                                <option value="Kharif">Kharif</option>
+                                <option value="Rabi">Rabi</option>
+                                <option value="Summer">Summer</option>
+                                <option value="Perennial">Perennial</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="fieldType">Field Type</label>
+                            <select id="fieldType" name="fieldType">
+                                <option value="">Select Field Type</option>
+                                <option value="Irrigated">Irrigated</option>
+                                <option value="Rainfed">Rainfed</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="location">Location/Area</label>
+                            <select id="location" name="location">
+                                <option value="">Select Location</option>
+                                <option value="GODAVARI DELTA">GODAVARI DELTA</option>
+                                <option value="KRI-DELTA & L soils">KRI-DELTA & L soils</option>
+                                <option value="NORTH COASTAL">NORTH COASTAL</option>
+                                <option value="SOUTH MANDL">SOUTH MANDL</option>
+                                <option value="NORTH TELENGANA">NORTH TELENGANA</option>
+                                <option value="SOUTH TELENGANA">SOUTH TELENGANA</option>
+                                <option value="LOW RAINFALL AREA">LOW RAINFALL AREA</option>
+                                <option value="High altitude Area">High altitude Area</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="soilType">Soil Type</label>
+                            <select id="soilType" name="soilType">
+                                <option value="">Select Soil Type</option>
+                                <option value="Light">Light</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Heavy">Heavy</option>
+                            </select>
+                            <small style="color: #666;">Soil texture classification</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="sulfur">Sulfur (ppm)</label>
+                            <input type="number" id="sulfur" name="sulfur" step="0.1" min="0" placeholder="e.g., 9">
+                            <small style="color: #666;">Available sulfur in ppm</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="ph">pH</label>
+                            <input type="number" id="ph" name="ph" step="0.1" min="0" max="14" placeholder="e.g., 7.3">
+                            <small style="color: #666;">Soil pH value (0-14)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="ec">EC (dS/m)</label>
+                            <input type="number" id="ec" name="ec" step="0.01" min="0" placeholder="e.g., 0.5">
+                            <small style="color: #666;">Electrical Conductivity</small>
+                        </div>
+                    </div>
+
+                    <!-- Secondary Nutrients -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="calcium">Calcium (cmol/kg)</label>
+                            <input type="number" id="calcium" name="calcium" step="0.1" min="0" placeholder="e.g., 2.0">
+                            <small style="color: #666;">Available calcium in cmol/kg</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="magnesium">Magnesium (cmol/kg)</label>
+                            <input type="number" id="magnesium" name="magnesium" step="0.1" min="0" placeholder="e.g., 0.9">
+                            <small style="color: #666;">Available magnesium in cmol/kg</small>
+                        </div>
+                    </div>
+
+                    <!-- Micronutrients -->
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label style="font-weight: 600; margin-bottom: 10px; display: block;">Micronutrients (ppm)</label>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="zinc">Zinc (Zn)</label>
+                                <input type="number" id="zinc" name="zinc" step="0.1" min="0" placeholder="e.g., 1.0">
+                                <small style="color: #666;">ppm</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="boron">Boron (B)</label>
+                                <input type="number" id="boron" name="boron" step="0.1" min="0" placeholder="e.g., 0.4">
+                                <small style="color: #666;">ppm</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="manganese">Manganese (Mn)</label>
+                                <input type="number" id="manganese" name="manganese" step="0.1" min="0" placeholder="e.g., 3.0">
+                                <small style="color: #666;">ppm</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="iron">Iron (Fe)</label>
+                                <input type="number" id="iron" name="iron" step="0.1" min="0" placeholder="e.g., 20">
+                                <small style="color: #666;">ppm</small>
+                            </div>
+                        </div>
+                        <div class="form-row" style="margin-top: 10px;">
+                            <div class="form-group">
+                                <label for="copper">Copper (Cu)</label>
+                                <input type="number" id="copper" name="copper" step="0.1" min="0" placeholder="e.g., 0.5">
+                                <small style="color: #666;">ppm</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="molybdenum">Molybdenum (Mo)</label>
+                                <input type="number" id="molybdenum" name="molybdenum" step="0.01" min="0" placeholder="e.g., 0.1">
+                                <small style="color: #666;">ppm</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="chlorine">Chlorine (Cl)</label>
+                                <input type="number" id="chlorine" name="chlorine" step="0.1" min="0" placeholder="e.g., 30">
+                                <small style="color: #666;">ppm</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gromor Combination Selection -->
+                    <div class="form-group">
+                        <label for="gromorCombination">Preferred Gromor Combination</label>
+                        <select id="gromorCombination" name="gromorCombination">
+                            <option value="">Auto-select based on Location</option>
+                            <option value="1">28-28-0 (basal) + 20-20-0 (1st top) + Urea + MOP</option>
+                            <option value="2">14-35-14 + 20-20-0</option>
+                            <option value="3">14-35-14 + 28-28-0</option>
+                            <option value="4">28-28-0 + 10-26-26</option>
+                            <option value="5">28-28-0 + 16-20-0</option>
+                            <option value="6">14-35-14 + 16-20-0</option>
+                        </select>
+                    </div>
+
+                    <!-- Fertilizer Preferences -->
+                    <div class="form-group">
+                        <label>Fertilizer Preferences</label>
+                        <div class="fertilizer-preferences">
+                            <div class="pref-item">
+                                <label>28-28-0</label>
+                                <select name="pref_28-28-0">
+                                    <option value="Optional">Optional</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Reject">Reject</option>
+                                </select>
+                            </div>
+                            <div class="pref-item">
+                                <label>14-35-14</label>
+                                <select name="pref_14-35-14">
+                                    <option value="Optional">Optional</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Reject">Reject</option>
+                                </select>
+                            </div>
+                            <div class="pref-item">
+                                <label>20-20-0</label>
+                                <select name="pref_20-20-0">
+                                    <option value="Optional">Optional</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Reject">Reject</option>
+                                </select>
+                            </div>
+                            <div class="pref-item">
+                                <label>10-26-26</label>
+                                <select name="pref_10-26-26">
+                                    <option value="Optional">Optional</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Reject">Reject</option>
+                                </select>
+                            </div>
+                            <div class="pref-item">
+                                <label>16-20-0</label>
+                                <select name="pref_16-20-0">
+                                    <option value="Optional">Optional</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Reject">Reject</option>
+                                </select>
+                            </div>
+                            <div class="pref-item">
+                                <label>Urea</label>
+                                <select name="pref_Urea">
+                                    <option value="Optional">Optional</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Reject">Reject</option>
+                                </select>
+                            </div>
+                            <div class="pref-item">
+                                <label>MOP</label>
+                                <select name="pref_MOP">
+                                    <option value="Optional">Optional</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Reject">Reject</option>
+                                </select>
+                            </div>
+                            <div class="pref-item">
+                                <label>SOP</label>
+                                <select name="pref_SOP">
+                                    <option value="Optional">Optional</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Reject">Reject</option>
+                                </select>
+                            </div>
+                            <div class="pref-item">
+                                <label>SSP</label>
+                                <select name="pref_SSP">
+                                    <option value="Optional">Optional</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Reject">Reject</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="button" id="getRecommendationBtn" class="btn-primary" onclick="handleFormSubmission()">Get Recommendation</button>
+                        <button type="button" id="savePayloadBtn" class="btn-secondary" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">💾 Save Payload</button>
+                        <button type="button" id="loadPayloadBtn" class="btn-secondary" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">📋 Load Saved Payload</button>
+                    </div>
+                    <div id="payloadNotification" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none; font-size: 14px;"></div>
+                </form>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <h2>SOIL TEST RESULTS</h2>
+                <h3 style="margin-top: 10px; color: #555;">FERTILIZER RECOMMENDATIONS</h3>
+                <div id="resultsContent"></div>
+            </section>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+    // ── SELF-TEST: runs after script.js loads ──────────────────────────
+    (function() {
+        var diagDiv = document.createElement('div');
+        diagDiv.id = 'btnDiag';
+        diagDiv.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#222;color:#0f0;font-family:monospace;font-size:12px;padding:10px 14px;border-radius:6px;z-index:9999;max-width:340px;line-height:1.6;';
+
+        var lines = [];
+        lines.push('🔍 Button Self-Test');
+
+        // 1. Is handleFormSubmission defined?
+        if (typeof handleFormSubmission === 'function') {
+            lines.push('✅ handleFormSubmission: defined');
+        } else {
+            lines.push('❌ handleFormSubmission: NOT FOUND');
+            diagDiv.style.background = '#700';
+        }
+
+        // 2. Is the button in DOM?
+        var btn = document.getElementById('getRecommendationBtn');
+        if (btn) {
+            lines.push('✅ Button: found in DOM');
+        } else {
+            lines.push('❌ Button: NOT in DOM');
+            diagDiv.style.background = '#700';
+        }
+
+        // 3. Is calculateRecommendations defined?
+        if (typeof calculateRecommendations === 'function') {
+            lines.push('✅ calculateRecommendations: defined');
+        } else {
+            lines.push('❌ calculateRecommendations: NOT FOUND');
+            diagDiv.style.background = '#700';
+        }
+
+        // 4. Are data files loaded?
+        try {
+            var dataLoaded = (typeof cropsData !== 'undefined' && Object.keys(cropsData).length > 0);
+            lines.push(dataLoaded ? '✅ cropsData: loaded' : '⚠️ cropsData: empty (will load on click)');
+        } catch(e) { lines.push('❌ cropsData: error'); }
+
+        // 5. Wire up button click test
+        if (btn && typeof handleFormSubmission === 'function') {
+            btn.title = 'handleFormSubmission is ready';
+        }
+
+        lines.push('─────────────────────');
+        lines.push('Click ✕ to hide');
+
+        diagDiv.innerHTML = lines.join('<br>') + '<br><span id="diagClose" style="cursor:pointer;color:#fa0;">✕ Close</span>';
+        document.body.appendChild(diagDiv);
+
+        document.getElementById('diagClose').onclick = function() {
+            diagDiv.style.display = 'none';
+        };
+    })();
+    </script>
+</body>
+</html>
+

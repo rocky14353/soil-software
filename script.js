@@ -1,0 +1,7611 @@
+// Master Data - Load from JSON files (in production, use fetch API)
+let cropsData = {};
+let fertilizerConversion = {};
+let locationsData = {};
+let soilTestClassification = {};
+let locationCropRecommendations = {};
+
+// Load data files
+async function loadData() {
+    try {
+        const cropsResponse = await fetch('data/crops.json');
+        cropsData = await cropsResponse.json();
+        
+        const conversionResponse = await fetch('data/fertilizer-conversion.json');
+        fertilizerConversion = await conversionResponse.json();
+        
+        const locationsResponse = await fetch('data/locations.json');
+        locationsData = await locationsResponse.json();
+        
+        const soilTestResponse = await fetch('data/soil-test-classification.json');
+        soilTestClassification = await soilTestResponse.json();
+        
+        const locationCropResponse = await fetch('data/location-crop-recommendations.json');
+        locationCropRecommendations = await locationCropResponse.json();
+    } catch (error) {
+        console.error('Error loading data:', error);
+        // Fallback to inline data if fetch fails
+        loadFallbackData();
+    }
+}
+
+// Fallback data (simplified version)
+function loadFallbackData() {
+    // This would be populated from the JSON files if fetch fails
+    console.log('Using fallback data');
+}
+
+// Initialize data on page load
+loadData();
+
+// Classify Nitrogen - Prefers Nitrogen value if available, otherwise uses Organic Carbon (from Data 3)
+function classifyNitrogenByOC(organicCarbon, nitrogen) {
+    // Priority: Use Nitrogen value if provided, otherwise use Organic Carbon
+    if (nitrogen !== null && nitrogen !== undefined && !isNaN(nitrogen) && nitrogen > 0) {
+        // Classify based on Nitrogen value (kg/acre)
+        // Thresholds: Low < 113, Medium 113-226, High > 226
+        if (nitrogen < 113) return 'low';
+        if (nitrogen <= 226) return 'medium';
+        return 'high';
+    }
+    
+    // Fall back to Organic Carbon if Nitrogen not available
+    if (organicCarbon < 0.5) return 'low';
+    if (organicCarbon <= 0.75) return 'medium';
+    return 'high';
+}
+
+// Classify Phosphorus (P2O5) - kg/acre (from Data 3)
+function classifyPhosphorus(p2o5) {
+    if (p2o5 < 10) return 'low';
+    if (p2o5 <= 24) return 'medium';
+    return 'high';
+}
+
+// Classify Potassium (K2O) - kg/acre (from Data 3)
+function classifyPotassium(k2o) {
+    if (k2o < 58) return 'low';
+    if (k2o <= 138) return 'medium';
+    return 'high';
+}
+
+// Classify Sulfur - ppm (from Data 3)
+function classifySulfur(sulfur) {
+    if (!sulfur || sulfur < 10) return 'low';
+    if (sulfur <= 15) return 'medium';
+    return 'high';
+}
+
+// Classify pH - from Data 3 (soil-test-classification.json)
+function classifyPh(ph) {
+    if (!ph || ph === 0) return null;
+    
+    if (ph <= 5.5) return 'stronglyAcidic';
+    if (ph >= 5.6 && ph <= 6.0) return 'mediumAcidic';
+    if (ph >= 6.1 && ph <= 6.5) return 'slightlyAcidic';
+    if (ph >= 6.6 && ph <= 7.3) return 'neutral';
+    if (ph >= 7.4 && ph <= 7.8) return 'slightlyAlkaline';
+    if (ph >= 7.9 && ph <= 8.4) return 'moderatelyAlkaline';
+    if (ph >= 8.5) return 'highlyAlkaline';
+    
+    return null;
+}
+
+// Classify EC (Electrical Conductivity) - dS/m
+function classifyEC(ec) {
+    if (!ec || ec === 0) return null;
+    if (ec < 0.5) return 'low';
+    if (ec <= 2.0) return 'medium';
+    return 'high';
+}
+
+// Classify Calcium - cmol/kg (Deficiency/Sufficiency)
+function classifyCalcium(ca) {
+    if (!ca || ca === 0) return null;
+    if (ca < 2.0) return 'deficiency';
+    return 'sufficiency';
+}
+
+// Classify Magnesium - cmol/kg (Deficiency/Sufficiency)
+function classifyMagnesium(mg) {
+    if (!mg || mg === 0) return null;
+    if (mg < 1.0) return 'deficiency';
+    return 'sufficiency';
+}
+
+// Classify Zinc - ppm (Deficiency/Sufficiency)
+function classifyZinc(zn) {
+    if (!zn || zn === 0) return null;
+    if (zn < 1.5) return 'deficiency';
+    return 'sufficiency';
+}
+
+// Classify Boron - ppm (Deficiency/Sufficiency)
+function classifyBoron(boron) {
+    if (!boron || boron === 0) return null;
+    if (boron < 0.5) return 'deficiency';
+    return 'sufficiency';
+}
+
+// Classify Manganese - ppm (Deficiency/Sufficiency)
+function classifyManganese(mn) {
+    if (!mn || mn === 0) return null;
+    if (mn < 5.0) return 'deficiency';
+    return 'sufficiency';
+}
+
+// Classify Iron - ppm (Deficiency/Sufficiency)
+function classifyIron(fe) {
+    if (!fe || fe === 0) return null;
+    if (fe < 10.0) return 'deficiency';
+    return 'sufficiency';
+}
+
+// Classify Copper - ppm (Deficiency/Sufficiency)
+function classifyCopper(cu) {
+    if (!cu || cu === 0) return null;
+    if (cu < 0.3) return 'deficiency';
+    return 'sufficiency';
+}
+
+// Classify Molybdenum - ppm (Deficiency/Sufficiency)
+function classifyMolybdenum(mo) {
+    if (!mo || mo === 0) return null;
+    if (mo < 0.15) return 'deficiency';
+    return 'sufficiency';
+}
+
+// Classify Chlorine - ppm (Deficiency/Sufficiency)
+function classifyChlorine(cl) {
+    if (!cl || cl === 0) return null;
+    if (cl < 20) return 'deficiency';
+    return 'sufficiency';
+}
+
+// Get pH-based recommendations/advisories
+function getPhRecommendations(phClassification) {
+    if (!phClassification) return null;
+    
+    const recommendations = {
+        stronglyAcidic: {
+            title: "Strongly Acidic Soil (pH ≤ 5.5)",
+            advisory: "Apply agricultural lime (CaCO3) to raise pH. Recommended: 2-4 tons/acre of lime before planting. Consider using basic fertilizers like Calcium Ammonium Nitrate (C.A.N).",
+            priority: "high"
+        },
+        mediumAcidic: {
+            title: "Medium Acidic Soil (pH 5.6-6.0)",
+            advisory: "Moderate liming recommended: 1-2 tons/acre of lime. Consider using neutral or basic fertilizers.",
+            priority: "medium"
+        },
+        slightlyAcidic: {
+            title: "Slightly Acidic Soil (pH 6.1-6.5)",
+            advisory: "Optimal for most crops. Minor liming may be beneficial: 0.5-1 ton/acre if needed.",
+            priority: "low"
+        },
+        neutral: {
+            title: "Neutral Soil (pH 6.6-7.3)",
+            advisory: "Optimal pH range for most crops. No pH correction needed. Continue regular fertilization practices.",
+            priority: "none"
+        },
+        slightlyAlkaline: {
+            title: "Slightly Alkaline Soil (pH 7.4-7.8)",
+            advisory: "Generally acceptable for most crops. Monitor for micronutrient availability. Consider using acid-forming fertilizers if needed.",
+            priority: "low"
+        },
+        moderatelyAlkaline: {
+            title: "Moderately Alkaline Soil (pH 7.9-8.4)",
+            advisory: "Apply gypsum (CaSO4) or sulfur to lower pH if needed: 1-2 tons/acre. Use acid-forming fertilizers. Monitor micronutrient deficiencies (especially Fe, Zn, Mn).",
+            priority: "medium"
+        },
+        highlyAlkaline: {
+            title: "Highly Alkaline Soil (pH ≥ 8.5)",
+            advisory: "Problematic soil. Apply gypsum (2-4 tons/acre) or elemental sulfur before planting. Use acid-forming fertilizers. Expect micronutrient deficiencies - consider foliar applications of Fe, Zn, Mn. Consider soil amendments and organic matter addition.",
+            priority: "high"
+        }
+    };
+    
+    return recommendations[phClassification] || null;
+}
+
+// Get crop key for lookup (handles Paddy specially)
+function getCropKey(crop, season) {
+    if (crop.toLowerCase().includes('paddy')) {
+        return season === 'Kharif' ? 'PADDY-KHARIF' : 'PADDY-RABI';
+    }
+    return crop.toUpperCase().replace(/\s+/g, '-');
+}
+
+// Get location-wise recommendation based on soil test status (from Data 2)
+function getLocationBasedRecommendation(crop, season, location, fieldType, nStatus, pStatus, kStatus) {
+    const cropKey = getCropKey(crop, season);
+    
+    // Try to find in location-crop-recommendations
+    if (locationCropRecommendations[cropKey] && locationCropRecommendations[cropKey][location]) {
+        const rec = locationCropRecommendations[cropKey][location];
+        return {
+            n: rec.nStatus[nStatus] || rec.normal.n,
+            p: rec.pStatus[pStatus] || rec.normal.p,
+            k: rec.kStatus[kStatus] || rec.normal.k,
+            gromorByPStatus: rec.gromorByPStatus
+        };
+    }
+    
+    // Fallback to crop master data
+    const cropData = getCropData(crop, season, fieldType);
+    if (cropData) {
+        return {
+            n: cropData.n,
+            p: cropData.p,
+            k: cropData.k,
+            gromorByPStatus: null
+        };
+    }
+    
+    return null;
+}
+
+// Classify nutrient level (legacy - kept for compatibility)
+function classifyNutrient(value, nutrient) {
+    const thresholds = {
+        nitrogen: { low: 150, high: 400 },
+        phosphorus: { low: 12, high: 35 },
+        potassium: { low: 80, high: 250 }
+    };
+    
+    const threshold = thresholds[nutrient.toLowerCase()];
+    if (!threshold) return 'medium';
+    
+    if (value < threshold.low) return 'low';
+    if (value > threshold.high) return 'high';
+    return 'medium';
+}
+
+// Interpolate from conversion table
+function interpolateFromTable(table, value, key) {
+    if (!table || table.length === 0) return 0;
+    
+    // Find exact match or interpolate
+    for (let i = 0; i < table.length; i++) {
+        if (table[i][key] >= value) {
+            if (i === 0) return table[0].dose || table[0].qty || 0;
+            
+            // Interpolate between previous and current
+            const prev = table[i - 1];
+            const curr = table[i];
+            const prevVal = prev[key];
+            const currVal = curr[key];
+            const prevDose = prev.dose || prev.qty || 0;
+            const currDose = curr.dose || curr.qty || 0;
+            
+            if (currVal === prevVal) return currDose;
+            
+            const ratio = (value - prevVal) / (currVal - prevVal);
+            return prevDose + (currDose - prevDose) * ratio;
+        }
+    }
+    
+    // Extrapolate from last value
+    const last = table[table.length - 1];
+    const factor = value / last[key];
+    return (last.dose || last.qty || 0) * factor;
+}
+
+// OPTIMIZED: Select best P fertilizer by evaluating all options for optimal results
+// EXCEPTION 6: Select appropriate P fertilizer based on stage
+// High P fertilizers (14-35-14, DAP 18-46-0) for basal
+// Low P fertilizers (20-20-0-13, 16-20-0-13, 28-28-0) for 2nd stage
+function selectP2O5Fertilizer(p2o5Kgs, stage, preferences, pStatus, locationRec) {
+    const isBasal = stage === 'Basal' || stage.toLowerCase().includes('basal');
+    const isFinal = stage === 'Final' || stage.toLowerCase().includes('final');
+    
+    // Evaluate all available fertilizers and pick the one with least excess
+    const candidates = [];
+    
+    // For Final stage, prefer SSP (most precise for small deficits)
+    if (isFinal) {
+        if (checkPreference('SSP', preferences) !== 'Reject') {
+            try {
+                const sspKgs = (p2o5Kgs / 16) * 100; // SSP has 16% P
+                const rounded = roundToBagUp(sspKgs, 50); // Round UP for final rebalancing
+                const actualP = (rounded.kgs * 16) / 100;
+                const excessP = Math.max(0, actualP - p2o5Kgs);
+                const score = excessP * 2.0; // SSP is very precise
+                candidates.push({ product: 'SSP', method: 'straight', score, kgs: rounded.kgs, nutrients: { n: 0, p: actualP, k: 0, s: (rounded.kgs * 12) / 100 } });
+            } catch (e) {
+                // Skip if calculation fails
+            }
+        }
+        // Also consider Gromor products for Final stage
+        const gromorOptions = ['14-35-14', '28-28-0', '20-20-0-13', '16-20-0-13'];
+        for (const product of gromorOptions) {
+            if (checkPreference(product, preferences) !== 'Reject') {
+                try {
+                    const kgs = convertP2O5ToGromorDirect(p2o5Kgs, product, pStatus, locationRec);
+                    const rounded = roundToBagUp(kgs, 50); // Round UP for final rebalancing
+                    const nutrients = getNutrientsFromGromor(rounded.kgs, product);
+                    const actualP = nutrients.p;
+                    const excessP = Math.max(0, actualP - p2o5Kgs);
+                    const bonusN = nutrients.n;
+                    const bonusK = nutrients.k;
+                    const score = (excessP * 2.0) - (bonusN * 0.2) - (bonusK * 0.15);
+                    candidates.push({ product, method: 'gromor', score, kgs: rounded.kgs, nutrients });
+                } catch (e) {
+                    // Skip if conversion fails
+                }
+            }
+        }
+    } else if (isBasal) {
+        // Basal: Evaluate high P fertilizers and SSP
+        const gromorOptions = ['14-35-14', '28-28-0', '10-26-26'];
+        for (const product of gromorOptions) {
+            if (checkPreference(product, preferences) !== 'Reject') {
+                try {
+                    const kgs = convertP2O5ToGromorDirect(p2o5Kgs, product, pStatus, locationRec);
+                    const rounded = roundToBag(kgs);
+                    const nutrients = getNutrientsFromGromor(rounded.kgs, product);
+                    const actualP = nutrients.p;
+                    const excessP = Math.max(0, actualP - p2o5Kgs);
+                    const bonusN = nutrients.n; // Bonus N from complex fertilizer
+                    const bonusK = nutrients.k; // Bonus K from complex fertilizer
+                    // Score: lower is better (prefer less excess P, but bonus for N/K)
+                    // Penalize excess P more, reward bonus N/K less
+                    const score = (excessP * 2.0) - (bonusN * 0.2) - (bonusK * 0.15);
+                    candidates.push({ product, method: 'gromor', score, kgs: rounded.kgs, nutrients });
+                } catch (e) {
+                    // Skip if conversion fails
+                }
+            }
+        }
+        
+        // Evaluate SSP (exclusive P, no N/K bonus but very precise)
+        if (checkPreference('SSP', preferences) !== 'Reject') {
+            try {
+                const sspKgs = (p2o5Kgs / 16) * 100; // SSP has 16% P
+                const rounded = roundToBag(sspKgs);
+                const actualP = (rounded.kgs * 16) / 100;
+                const excessP = Math.max(0, actualP - p2o5Kgs);
+                // SSP is very precise, score based on excess only (no bonus N/K)
+                const score = excessP * 2.0; // Same penalty weight as Gromor
+                candidates.push({ product: 'SSP', method: 'straight', score, kgs: rounded.kgs, nutrients: { n: 0, p: actualP, k: 0, s: (rounded.kgs * 12) / 100 } });
+            } catch (e) {
+                // Skip if calculation fails
+            }
+        }
+    } else {
+        // 2nd Stage: Evaluate low P fertilizers (SSP excluded - powder form, difficult to apply)
+        const gromorOptions = ['20-20-0-13', '16-20-0-13', '28-28-0'];
+        for (const product of gromorOptions) {
+            if (checkPreference(product, preferences) !== 'Reject') {
+                try {
+                    const kgs = convertP2O5ToGromorDirect(p2o5Kgs, product, pStatus, locationRec);
+                    const rounded = roundToBag(kgs);
+                    const nutrients = getNutrientsFromGromor(rounded.kgs, product);
+                    const actualP = nutrients.p;
+                    const excessP = Math.max(0, actualP - p2o5Kgs);
+                    const bonusN = nutrients.n; // Bonus N from complex fertilizer
+                    const bonusK = nutrients.k; // Bonus K from complex fertilizer
+                    // Score: lower is better (prefer less excess P, but bonus for N/K)
+                    const score = (excessP * 2.0) - (bonusN * 0.2) - (bonusK * 0.15);
+                    candidates.push({ product, method: 'gromor', score, kgs: rounded.kgs, nutrients });
+                } catch (e) {
+                    // Skip if conversion fails
+                }
+            }
+        }
+    }
+    
+    // Select candidate with best (lowest) score
+    if (candidates.length > 0) {
+        candidates.sort((a, b) => a.score - b.score);
+        const best = candidates[0];
+        return { product: best.product, method: best.method };
+    }
+    
+    // Fallback to original logic if no candidates
+    if (isBasal) {
+        if (checkPreference('14-35-14', preferences) !== 'Reject') {
+            return { product: '14-35-14', method: 'gromor' };
+        }
+        if (checkPreference('SSP', preferences) !== 'Reject') {
+            return { product: 'SSP', method: 'straight' };
+        }
+        if (checkPreference('28-28-0', preferences) !== 'Reject') {
+            return { product: '28-28-0', method: 'gromor' };
+        }
+    } else {
+        if (checkPreference('20-20-0-13', preferences) !== 'Reject') {
+            return { product: '20-20-0-13', method: 'gromor' };
+        }
+        if (checkPreference('16-20-0-13', preferences) !== 'Reject') {
+            return { product: '16-20-0-13', method: 'gromor' };
+        }
+        if (checkPreference('28-28-0', preferences) !== 'Reject') {
+            return { product: '28-28-0', method: 'gromor' };
+        }
+    }
+    
+    // Final fallback
+    return { product: '28-28-0', method: 'gromor' };
+}
+
+// Convert P2O5 to Gromor product
+function convertP2O5ToGromor(p2o5Kgs, product) {
+    const table = fertilizerConversion.p2o5ToGromor[product];
+    if (!table) {
+        // Fallback calculation
+        const productData = fertilizerConversion.fertilizerProducts[product];
+        if (!productData || productData.p === 0) return 0;
+        return (p2o5Kgs / productData.p) * 100;
+    }
+    
+    return interpolateFromTable(table, p2o5Kgs, 'p2o5');
+}
+
+// Get N, P, and K from Gromor product
+function getNutrientsFromGromor(doseKgs, product) {
+    const productData = fertilizerConversion.fertilizerProducts[product];
+    if (!productData) return { n: 0, p: 0, k: 0 };
+    
+    return {
+        n: (doseKgs * productData.n) / 100,
+        p: (doseKgs * productData.p) / 100,
+        k: (doseKgs * productData.k) / 100
+    };
+}
+
+// Calculate actual nutrients from straight fertilizer quantity (after rounding to bags)
+// Now uses fertilizerProducts data instead of hardcoded values for consistency
+function getNutrientsFromStraight(fertilizerKgs, fertilizer) {
+    const fertName = fertilizer.toLowerCase();
+    
+    // First try to get from fertilizerProducts (preferred method)
+    const productData = fertilizerConversion.fertilizerProducts[fertName];
+    if (productData) {
+        return {
+            n: (fertilizerKgs * productData.n) / 100,
+            p: (fertilizerKgs * productData.p) / 100,
+            k: (fertilizerKgs * productData.k) / 100,
+            s: productData.s ? (fertilizerKgs * productData.s) / 100 : 0
+        };
+    }
+    
+    // Fallback to hardcoded values for backward compatibility (should not be needed)
+    // N fertilizers
+    if (fertName === 'urea') {
+        return { n: (fertilizerKgs * 46) / 100, p: 0, k: 0 };
+    } else if (fertName === 'as' || fertName === 'a.s') {
+        return { n: (fertilizerKgs * 21) / 100, p: 0, k: 0, s: (fertilizerKgs * 24) / 100 };
+    } else if (fertName === 'can' || fertName === 'c.a.n') {
+        return { n: (fertilizerKgs * 25) / 100, p: 0, k: 0 };
+    }
+    // K fertilizers
+    else if (fertName === 'mop') {
+        return { n: 0, p: 0, k: (fertilizerKgs * 60) / 100 };
+    } else if (fertName === 'sop') {
+        return { n: 0, p: 0, k: (fertilizerKgs * 50) / 100, s: (fertilizerKgs * 18) / 100 };
+    }
+    // P fertilizers
+    else if (fertName === 'ssp') {
+        return { n: 0, p: (fertilizerKgs * 16) / 100, k: 0, s: (fertilizerKgs * 12) / 100 };
+    } else if (fertName === 'dap' || fertName === '18-46-0') {
+        // DAP: 18% N, 46% P2O5
+        return { n: (fertilizerKgs * 18) / 100, p: (fertilizerKgs * 46) / 100, k: 0 };
+    }
+    
+    return { n: 0, p: 0, k: 0 };
+}
+
+// Convert N to straight fertilizer
+function convertNToStraight(nKgs, fertilizer) {
+    const table = fertilizerConversion.nToStraight[fertilizer];
+    if (!table) {
+        // Fallback calculation
+        const factor = fertilizerConversion.conversionFactors[fertilizer];
+        return nKgs * (factor || 2.2);
+    }
+    
+    return interpolateFromTable(table, nKgs, 'n');
+}
+
+// Convert K2O to straight fertilizer
+function convertK2OToStraight(k2oKgs, fertilizer) {
+    const table = fertilizerConversion.k2oToStraight[fertilizer];
+    if (!table) {
+        // Fallback calculation
+        const factor = fertilizerConversion.conversionFactors[fertilizer];
+        return k2oKgs * (factor || 1.7);
+    }
+    
+    return interpolateFromTable(table, k2oKgs, 'k2o');
+}
+
+// NEW REDESIGN: Round to bag with 2.5kg and 5kg steps, choosing more precise
+// Uses midpoint tolerance: if < midpoint, round down; if >= midpoint, round up
+// Bag sizes: Urea = 45kg, Others = 50kg
+function roundToBagPrecise(kgs, bagSize = 50, roundUp = false) {
+    // Generate options with 2.5kg and 5kg steps
+    const options = [];
+    
+    // 5kg steps: 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60...
+    for (let i = 5; i <= Math.ceil(kgs) + 20; i += 5) {
+        options.push(i);
+    }
+    
+    // 2.5kg steps: 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5...
+    for (let i = 2.5; i <= Math.ceil(kgs) + 20; i += 5) {
+        options.push(i);
+    }
+    
+    // Remove duplicates and sort
+    const uniqueOptions = [...new Set(options)].sort((a, b) => a - b);
+    
+    // Find the two closest options
+    let lower = 0;
+    let upper = uniqueOptions.length > 0 ? uniqueOptions[0] : kgs;
+    
+    for (let i = 0; i < uniqueOptions.length; i++) {
+        if (uniqueOptions[i] <= kgs) {
+            lower = uniqueOptions[i];
+            upper = uniqueOptions[i + 1] || uniqueOptions[i];
+        } else {
+            upper = uniqueOptions[i];
+            break;
+        }
+    }
+    
+    // Safety check: if upper is still 0 or undefined, use kgs rounded up
+    if (!upper || upper === 0) {
+        upper = Math.ceil(kgs / 5) * 5; // Round to nearest 5kg
+    }
+    
+    // If roundUp is true (for P/N), always round up
+    if (roundUp) {
+        const rounded = upper;
+        const bags = rounded / bagSize;
+        return {
+            kgs: rounded,
+            bags: bags,
+            fullBags: Math.floor(bags),
+            remainder: rounded % bagSize,
+            label: `${rounded} kg (${bags.toFixed(2)} bag(s))`,
+            original: kgs
+        };
+    }
+    
+    // Otherwise use midpoint tolerance (for K)
+    const midpoint = (lower + upper) / 2;
+    const rounded = kgs < midpoint ? lower : upper;
+    const bags = rounded / bagSize;
+    
+    return {
+        kgs: rounded,
+        bags: bags,
+        fullBags: Math.floor(bags),
+        remainder: rounded % bagSize,
+        label: `${rounded} kg (${bags.toFixed(2)} bag(s))`,
+        original: kgs
+    };
+}
+
+// Round to nearest bag fraction (for K - uses nearest, not always up)
+function roundToBag(kgs, bagSize = 50) {
+    const fullBag = Math.round(kgs / bagSize);
+    const halfBag = Math.round(kgs / (bagSize / 2)) * 0.5;
+    const quarterBag = Math.round(kgs / (bagSize / 4)) * 0.25;
+    
+    const options = [
+        { value: fullBag * bagSize, label: `${fullBag} bag(s)`, bags: fullBag },
+        { value: halfBag * bagSize, label: `${halfBag} bag(s)`, bags: halfBag },
+        { value: quarterBag * bagSize, label: `${quarterBag} bag(s)`, bags: quarterBag }
+    ];
+    
+    const nearest = options.reduce((prev, curr) => {
+        return Math.abs(curr.value - kgs) < Math.abs(prev.value - kgs) ? curr : prev;
+    });
+    
+    return {
+        kgs: nearest.value,
+        label: nearest.label,
+        bags: nearest.bags,
+        fullBags: Math.floor(nearest.bags),
+        remainder: nearest.value % bagSize,
+        original: kgs
+    };
+}
+
+// Round to bag fraction ensuring we meet minimum requirement (always rounds up)
+function roundToBagUp(kgs, bagSize = 45) {
+    const fullBag = Math.ceil(kgs / bagSize);
+    const halfBag = Math.ceil(kgs / (bagSize / 2)) * 0.5;
+    const quarterBag = Math.ceil(kgs / (bagSize / 4)) * 0.25;
+    
+    const options = [
+        { value: fullBag * bagSize, label: `${fullBag} bag(s)`, bags: fullBag },
+        { value: halfBag * bagSize, label: `${halfBag} bag(s)`, bags: halfBag },
+        { value: quarterBag * bagSize, label: `${quarterBag} bag(s)`, bags: quarterBag }
+    ];
+    
+    // Find the smallest option that meets or exceeds the requirement
+    const validOptions = options.filter(opt => opt.value >= kgs);
+    if (validOptions.length > 0) {
+        const smallest = validOptions.reduce((prev, curr) => {
+            return curr.value < prev.value ? curr : prev;
+        });
+        return {
+            kgs: smallest.value,
+            bags: smallest.bags,
+            label: smallest.label,
+            original: kgs
+        };
+    }
+    
+    // Fallback to nearest if somehow all are below (shouldn't happen with ceil)
+    return roundToBag(kgs, bagSize);
+}
+
+// Smart round to bag: ensures minimum requirement is met if critical
+// If rounding down would result in significant under-delivery, round up instead
+function roundToBagSmart(kgs, bagSize = 45, minRequired = null, tolerance = 0.10) {
+    // If no minimum requirement specified, use standard rounding
+    if (minRequired === null) {
+        return roundToBag(kgs, bagSize);
+    }
+    
+    // Calculate what would be delivered if we round down
+    const roundedDown = roundToBag(kgs, bagSize);
+    const wouldDeliver = roundedDown.kgs;
+    
+    // Check if rounding down would result in under-delivery beyond tolerance
+    const minAllowed = minRequired * (1 - tolerance);
+    
+    if (wouldDeliver < minAllowed) {
+        // Round up to ensure minimum is met
+        return roundToBagUp(kgs, bagSize);
+    }
+    
+    // Otherwise, round to nearest (minimizes excess)
+    return roundedDown;
+}
+
+// Check fertilizer preference
+function checkPreference(fertilizer, preferences) {
+    const prefKey = `pref_${fertilizer}`;
+    const pref = preferences[prefKey] || 'Optional';
+    return pref;
+}
+
+// Check if fertilizer contains sulfur
+function fertilizerContainsSulfur(fertilizer) {
+    const sulfurFertilizers = ['A.S', 'SOP', '20-20-0-13', '16-20-0-13'];
+    return sulfurFertilizers.includes(fertilizer) || fertilizer.includes('20-0-13') || fertilizer.includes('16-20-0');
+}
+
+// Check if fertilizer is acidifying (lowers pH)
+function fertilizerIsAcidifying(fertilizer) {
+    const acidifyingFertilizers = ['Urea', 'A.S'];
+    return acidifyingFertilizers.includes(fertilizer);
+}
+
+// Check if fertilizer is neutral/basic (raises pH or neutral)
+function fertilizerIsNeutral(fertilizer) {
+    const neutralFertilizers = ['C.A.N'];
+    return neutralFertilizers.includes(fertilizer);
+}
+
+// Determine if fertilizer should be preferred based on S status
+function shouldPreferFertilizerForS(fertilizer, sStatus) {
+    if (!sStatus) return true; // No preference if S status unknown
+    
+    const hasSulfur = fertilizerContainsSulfur(fertilizer);
+    
+    if (sStatus === 'low') {
+        // Prefer sulfur-containing fertilizers if S is low
+        return hasSulfur;
+    } else if (sStatus === 'high') {
+        // Avoid sulfur-containing fertilizers if S is high
+        return !hasSulfur;
+    }
+    // Medium S: no preference
+    return true;
+}
+
+// Determine if fertilizer should be preferred based on pH
+function shouldPreferFertilizerForPh(fertilizer, phStatus) {
+    if (!phStatus) return true; // No preference if pH status unknown
+    
+    const isAcidifying = fertilizerIsAcidifying(fertilizer);
+    const isNeutral = fertilizerIsNeutral(fertilizer);
+    const hasSulfur = fertilizerContainsSulfur(fertilizer);
+    
+    // Acidic soils: prefer neutral/basic fertilizers
+    if (phStatus === 'stronglyAcidic' || phStatus === 'mediumAcidic' || phStatus === 'slightlyAcidic') {
+        if (isNeutral) return true; // Prefer C.A.N
+        if (isAcidifying) return false; // Avoid Urea, A.S
+    }
+    
+    // Alkaline soils: prefer acidifying and sulfur-containing fertilizers
+    if (phStatus === 'moderatelyAlkaline' || phStatus === 'highlyAlkaline') {
+        if (isAcidifying || hasSulfur) return true; // Prefer Urea, A.S, sulfur fertilizers
+    }
+    
+    // Neutral and slightly alkaline: no strong preference
+    return true;
+}
+
+// Check if fertilizer should be used considering S and pH status
+function shouldUseFertilizer(fertilizer, preferences, sStatus, phStatus) {
+    // First check user preferences
+    if (checkPreference(fertilizer, preferences) === 'Reject') return false;
+    if (checkPreference(fertilizer, preferences) === 'Mandatory') return true;
+    
+    // Then check S status preference
+    if (!shouldPreferFertilizerForS(fertilizer, sStatus)) {
+        // Don't reject, but lower priority (only reject if user explicitly rejects)
+        return false;
+    }
+    
+    // Then check pH preference
+    if (!shouldPreferFertilizerForPh(fertilizer, phStatus)) {
+        // Don't reject, but lower priority
+        return false;
+    }
+    
+    return true;
+}
+
+// Select best N fertilizer based on S and pH status
+function selectNFertilizer(nRequired, preferences, sStatus, phStatus) {
+    if (nRequired <= 0) return null;
+    
+    // Priority order based on S and pH
+    const candidates = [];
+    
+    // If S is low, prefer A.S (contains 24% S)
+    if (sStatus === 'low') {
+        if (shouldUseFertilizer('A.S', preferences, sStatus, phStatus)) {
+            candidates.push({name: 'A.S', priority: 1});
+        }
+    }
+    
+    // If pH is acidic, prefer C.A.N (neutral, less acidifying)
+    if (phStatus === 'stronglyAcidic' || phStatus === 'mediumAcidic' || phStatus === 'slightlyAcidic') {
+        if (shouldUseFertilizer('C.A.N', preferences, sStatus, phStatus)) {
+            candidates.push({name: 'C.A.N', priority: 1});
+        }
+    }
+    
+    // If pH is alkaline, prefer Urea or A.S (acid-forming)
+    if (phStatus === 'moderatelyAlkaline' || phStatus === 'highlyAlkaline') {
+        if (shouldUseFertilizer('Urea', preferences, sStatus, phStatus)) {
+            candidates.push({name: 'Urea', priority: 1});
+        }
+        if (shouldUseFertilizer('A.S', preferences, sStatus, phStatus)) {
+            candidates.push({name: 'A.S', priority: 1});
+        }
+    }
+    
+    // Default to Urea if no specific preference
+    if (shouldUseFertilizer('Urea', preferences, sStatus, phStatus)) {
+        candidates.push({name: 'Urea', priority: 2});
+    }
+    if (shouldUseFertilizer('C.A.N', preferences, sStatus, phStatus)) {
+        candidates.push({name: 'C.A.N', priority: 2});
+    }
+    if (shouldUseFertilizer('A.S', preferences, sStatus, phStatus)) {
+        candidates.push({name: 'A.S', priority: 2});
+    }
+    
+    // Select highest priority candidate
+    if (candidates.length > 0) {
+        candidates.sort((a, b) => a.priority - b.priority);
+        return candidates[0].name;
+    }
+    
+    return 'Urea'; // Fallback
+}
+
+// Select best K fertilizer based on S and pH status
+function selectKFertilizer(kRequired, preferences, sStatus, phStatus) {
+    if (kRequired <= 0) return null;
+    
+    // If S is low or pH is alkaline, prefer SOP (contains 18% S)
+    if ((sStatus === 'low' || phStatus === 'moderatelyAlkaline' || phStatus === 'highlyAlkaline') 
+        && shouldUseFertilizer('SOP', preferences, sStatus, phStatus)) {
+        return 'SOP';
+    }
+    
+    // If S is high, prefer MOP (no sulfur)
+    if (sStatus === 'high' && shouldUseFertilizer('MOP', preferences, sStatus, phStatus)) {
+        return 'MOP';
+    }
+    
+    // Default to MOP
+    if (shouldUseFertilizer('MOP', preferences, sStatus, phStatus)) {
+        return 'MOP';
+    }
+    if (shouldUseFertilizer('SOP', preferences, sStatus, phStatus)) {
+        return 'SOP';
+    }
+    
+    return 'MOP'; // Fallback
+}
+
+/**
+ * Select N fertilizer for SINGLE-NUTRIENT top-up mode
+ * Prefers Urea first when doing pure N-only fill
+ * @param {number} nRequired - N requirement
+ * @param {object} preferences - Fertilizer preferences
+ * @param {string} sStatus - S status
+ * @param {string} phStatus - pH status
+ * @param {boolean} isSingleNutrientMode - True if this is pure single-nutrient top-up
+ * @returns {string|null} Fertilizer name
+ */
+function selectNFertilizerForSingleNutrientTopUp(nRequired, preferences, sStatus, phStatus, isSingleNutrientMode) {
+    if (nRequired <= 0) return null;
+    
+    // In single-nutrient top-up mode, prefer Urea first
+    if (isSingleNutrientMode) {
+        if (shouldUseFertilizer('Urea', preferences, sStatus, phStatus)) {
+            return 'Urea';
+        }
+        // Fallback to existing logic if Urea unavailable
+    }
+    
+    // Use existing logic for non-single-nutrient mode or if Urea unavailable
+    return selectNFertilizer(nRequired, preferences, sStatus, phStatus);
+}
+
+/**
+ * Select P fertilizer for SINGLE-NUTRIENT top-up mode
+ * Prefers SSP first, then DAP (if N doesn't violate constraints)
+ * @param {number} pRequired - P requirement
+ * @param {object} preferences - Fertilizer preferences
+ * @param {number} stageIndex - Stage index
+ * @param {number} originalStageN - Original stage N target
+ * @param {number} deliveredN - Already delivered N
+ * @param {boolean} isSingleNutrientMode - True if this is pure single-nutrient top-up
+ * @returns {string|null} Fertilizer name ('SSP' or 'DAP')
+ */
+function selectPFertilizerForSingleNutrientTopUp(pRequired, preferences, stageIndex, originalStageN, deliveredN, isSingleNutrientMode) {
+    if (pRequired <= 0) return null;
+    
+    // In single-nutrient top-up mode, prefer SSP first
+    if (isSingleNutrientMode) {
+        // Prefer SSP first
+        if (checkPreference('SSP', preferences) !== 'Reject') {
+            return 'SSP';
+        }
+        
+        // Fallback to DAP if SSP unavailable, but check N constraint
+        if (checkPreference('DAP', preferences) !== 'Reject' || checkPreference('18-46-0', preferences) !== 'Reject') {
+            // DAP contributes N (18%), so check if it would violate stage N cap
+            // Estimate: pRequired kg P needs (pRequired / 46) * 100 kg DAP
+            // This contributes (pRequired / 46) * 100 * 0.18 = pRequired * 18/46 ≈ pRequired * 0.39 kg N
+            const estimatedDAPKgs = (pRequired / 46) * 100;
+            const estimatedNFromDAP = (estimatedDAPKgs * 18) / 100;
+            const totalNAfterDAP = deliveredN + estimatedNFromDAP;
+            
+            // Check if DAP's N contribution would violate stage cap (with 12% tolerance)
+            if (totalNAfterDAP <= originalStageN * 1.12) {
+                return 'DAP';
+            } else {
+                console.log(`[Single-Nutrient P Top-Up] DAP rejected - would exceed stage N cap (${totalNAfterDAP.toFixed(2)} > ${(originalStageN * 1.12).toFixed(2)})`);
+            }
+        }
+        
+        // If both SSP and DAP unavailable/invalid, return null (will use existing fallback)
+        return null;
+    }
+    
+    // Non-single-nutrient mode: use SSP as default
+    if (checkPreference('SSP', preferences) !== 'Reject') {
+        return 'SSP';
+    }
+    
+    return null;
+}
+
+/**
+ * Select K fertilizer for SINGLE-NUTRIENT top-up mode
+ * Prefers MOP first, then SOP when doing pure K-only fill
+ * @param {number} kRequired - K requirement
+ * @param {object} preferences - Fertilizer preferences
+ * @param {string} sStatus - S status
+ * @param {string} phStatus - pH status
+ * @param {boolean} isSingleNutrientMode - True if this is pure single-nutrient top-up
+ * @returns {string|null} Fertilizer name
+ */
+function selectKFertilizerForSingleNutrientTopUp(kRequired, preferences, sStatus, phStatus, isSingleNutrientMode) {
+    if (kRequired <= 0) return null;
+    
+    // In single-nutrient top-up mode, prefer MOP first, then SOP
+    if (isSingleNutrientMode) {
+        // Prefer MOP first
+        if (shouldUseFertilizer('MOP', preferences, sStatus, phStatus)) {
+            return 'MOP';
+        }
+        
+        // Fallback to SOP if MOP unavailable
+        if (shouldUseFertilizer('SOP', preferences, sStatus, phStatus)) {
+            return 'SOP';
+        }
+        
+        // If both unavailable, return null (will use existing fallback)
+        return null;
+    }
+    
+    // Use existing logic for non-single-nutrient mode
+    return selectKFertilizer(kRequired, preferences, sStatus, phStatus);
+}
+
+// Get crop data
+function getCropData(cropName, season, fieldType) {
+    const crop = cropsData[cropName];
+    if (!crop) return null;
+    
+    const fieldTypeKey = (fieldType || 'Irrigated').toLowerCase();
+    const seasonKey = (season || 'Rabi').toLowerCase();
+    
+    return crop[fieldTypeKey]?.[seasonKey] || crop[fieldTypeKey]?.['rabi'] || null;
+}
+
+// ============================================================================
+// NEW P-FIRST CALCULATION LOGIC - REDESIGNED RECOMMENDATION SYSTEM
+// ============================================================================
+
+/**
+ * Calculate constrained fertilizer quantity respecting all nutrient limits
+ * Multi-constraint approach: quantity must satisfy P requirement while not exceeding N/K limits
+ * 
+ * @param {string} fertilizerName - Fertilizer product name (e.g., '14-35-14', '28-28-0')
+ * @param {number} stagePRequired - P requirement for this stage (kg/acre)
+ * @param {number} stageNRequired - N requirement for this stage (kg/acre)
+ * @param {number} stageKRequired - K requirement for this stage (kg/acre)
+ * @param {number} stageIndex - Stage index (0=Basal, 1=Tillering, 2=Panicle)
+ * @param {string} pStatus - P status: 'low', 'medium', 'high'
+ * @param {object} locationRec - Location recommendations
+ * @returns {object|null} - { quantity, nutrients, valid } or null if invalid
+ */
+function calculateConstrainedQuantity(fertilizerName, stagePRequired, stageNRequired, stageKRequired,
+                                     stageIndex, pStatus, locationRec) {
+    // Get fertilizer composition
+    const productData = fertilizerConversion.fertilizerProducts[fertilizerName];
+    if (!productData) {
+        console.warn(`[Multi-Constraint] Fertilizer ${fertilizerName} not found in fertilizerProducts`);
+        return null;
+    }
+    
+    // 1. Check stage restrictions
+    if (stageIndex === 1 && productData.k > 0) {
+        console.log(`[Multi-Constraint] Rejecting ${fertilizerName}: K not allowed in Tillering stage (K=${productData.k}%)`);
+        return null; // K not allowed in Tillering
+    }
+    if (stageIndex === 2 && productData.p > 0) {
+        console.log(`[Multi-Constraint] Rejecting ${fertilizerName}: P not allowed in Panicle stage (P=${productData.p}%)`);
+        return null; // P not allowed in Panicle
+    }
+    
+    // 2. Calculate quantity limits from each nutrient
+    const quantityFromP = convertP2O5ToGromorDirect(stagePRequired, fertilizerName, pStatus, locationRec);
+    
+    // STRICT: Calculate MAXIMUM quantity allowed from N limit (N must NOT exceed stageNRequired)
+    let quantityFromN = Infinity;
+    if (productData.n > 0 && stageNRequired > 0) {
+        quantityFromN = (stageNRequired / productData.n) * 100;
+    }
+    
+    // STRICT: Calculate MAXIMUM quantity allowed from K limit
+    let quantityFromK = Infinity;
+    if (productData.k > 0 && stageKRequired > 0 && stageIndex !== 1) {
+        quantityFromK = (stageKRequired / productData.k) * 100;
+    }
+    
+    // 3. Find minimum valid quantity (must satisfy ALL constraints - N is the most restrictive)
+    const limits = [];
+    if (quantityFromN !== Infinity) limits.push(quantityFromN); // N limit is CRITICAL
+    if (quantityFromP > 0) limits.push(quantityFromP);
+    if (quantityFromK !== Infinity) limits.push(quantityFromK);
+    
+    if (limits.length === 0) return null;
+    const minQuantity = Math.min(...limits);
+    
+    // 4. Validate: ensure P is satisfied AND N/K limits are respected
+    const nutrients = getNutrientsFromGromor(minQuantity, fertilizerName);
+    
+    // STRICT: N must NOT exceed limit
+    if (nutrients.n > stageNRequired) {
+        return null;
+    }
+    
+    // STRICT: K must NOT exceed limit
+    if (stageIndex !== 1 && nutrients.k > stageKRequired) {
+        return null;
+    }
+    
+    // If P not satisfied, try rounding up ONLY if it doesn't violate N/K limits
+    if (nutrients.p < stagePRequired * 0.95) {
+        const roundedUp = roundToBagPrecise(minQuantity, 50, true);
+        const nutrientsUp = getNutrientsFromGromor(roundedUp.kgs, fertilizerName);
+        
+        // STRICT: Check N/K limits BEFORE accepting rounded up quantity
+        if (nutrientsUp.n > stageNRequired) {
+            return null;
+        }
+        if (stageIndex !== 1 && nutrientsUp.k > stageKRequired) {
+            return null;
+        }
+        
+        if (nutrientsUp.p >= stagePRequired * 0.95) {
+            return { quantity: roundedUp.kgs, nutrients: nutrientsUp, valid: true };
+        }
+        
+        return null;
+    }
+    
+    // Round to bag size
+    const rounded = roundToBagPrecise(minQuantity, 50, true);
+    const roundedNutrients = getNutrientsFromGromor(rounded.kgs, fertilizerName);
+    
+    // STRICT FINAL VALIDATION: No N/K overflow allowed after rounding
+    if (roundedNutrients.n > stageNRequired) {
+        console.warn(`[Multi-Constraint] ${fertilizerName}: Rounded quantity causes N overflow - REJECTED`);
+        return null;
+    }
+    if (stageIndex !== 1 && roundedNutrients.k > stageKRequired) {
+        console.warn(`[Multi-Constraint] ${fertilizerName}: Rounded quantity causes K overflow - REJECTED`);
+        return null;
+    }
+    
+    return { quantity: rounded.kgs, nutrients: roundedNutrients, valid: true };
+}
+
+/**
+ * Eligibility Guard Function
+ * Checks if a fertilizer is allowed in a specific stage based on restrictions and overflow limits
+ * @param {object} fertilizer - Fertilizer object with n, p, k properties (nutrients contributed)
+ * @param {number} stageIndex - Stage index (0=Basal, 1=Tillering, 2=Panicle)
+ * @param {object} stageTargets - Stage targets {n, p, k}
+ * @param {object} deliveredNutrients - Already delivered nutrients {n, p, k}
+ * @param {number} tolerance - Tolerance for overflow (default 0.1 = 10%)
+ * @returns {object} {allowed: boolean, reason: string}
+ */
+function isFertilizerAllowedInStage(fertilizer, stageIndex, stageTargets, deliveredNutrients, tolerance = 0.12) {
+    const restrictions = {
+        k: stageIndex === 1 ? 0 : undefined, // Tillering: K=0
+        p: stageIndex === 2 ? 0 : undefined  // Panicle: P=0
+    };
+    
+    // Extract nutrient contributions from fertilizer object
+    const fertN = fertilizer.nContributed || fertilizer.n || 0;
+    const fertP = fertilizer.pContributed || fertilizer.p || 0;
+    const fertK = fertilizer.kContributed || fertilizer.k || 0;
+    
+    // Check disallowed nutrients (hard rules - no tolerance)
+    if (restrictions.k === 0 && fertK > 0.01) {
+        return { allowed: false, reason: 'K not allowed in Tillering stage' };
+    }
+    if (restrictions.p === 0 && fertP > 0.01) {
+        return { allowed: false, reason: 'P not allowed in Panicle stage' };
+    }
+    
+    // CRITICAL: Check overflow for ALL nutrients (N, P, K) - enforce stage caps
+    const totalNAfter = (deliveredNutrients.n || 0) + fertN;
+    const stageNCap = (stageTargets.n || 0) * (1 + tolerance);
+    if (totalNAfter > stageNCap) {
+        return { allowed: false, reason: `N overflow: ${totalNAfter.toFixed(2)} > ${stageNCap.toFixed(2)} (stage target: ${(stageTargets.n || 0).toFixed(2)})` };
+    }
+    
+    // CRITICAL: Check P overflow (was missing!)
+    const totalPAfter = (deliveredNutrients.p || 0) + fertP;
+    const stagePCap = (stageTargets.p || 0) * (1 + tolerance);
+    if (stageIndex !== 2 && totalPAfter > stagePCap) { // Panicle already checked above
+        return { allowed: false, reason: `P overflow: ${totalPAfter.toFixed(2)} > ${stagePCap.toFixed(2)} (stage target: ${(stageTargets.p || 0).toFixed(2)})` };
+    }
+    
+    // Check K overflow
+    const totalKAfter = (deliveredNutrients.k || 0) + fertK;
+    const stageKCap = (stageTargets.k || 0) * (1 + tolerance);
+    if (stageIndex !== 1 && totalKAfter > stageKCap) { // Tillering already checked above
+        return { allowed: false, reason: `K overflow: ${totalKAfter.toFixed(2)} > ${stageKCap.toFixed(2)} (stage target: ${(stageTargets.k || 0).toFixed(2)})` };
+    }
+    
+    return { allowed: true, reason: '' };
+}
+
+/**
+ * Safe Fertilizer Addition Wrapper
+ * Validates fertilizer before adding to stage and logs debug information
+ * @param {object} stage - Stage object with fertilizers array
+ * @param {object} fertilizer - Fertilizer object to add
+ * @param {number} stageIndex - Stage index
+ * @param {object} stageTargets - Stage targets {n, p, k}
+ * @param {object} deliveredNutrients - Already delivered nutrients {n, p, k}
+ * @param {string} passName - Name of the pass (e.g., 'initial', 'fill', 'balance', 'rounding', 'correction')
+ * @returns {boolean} true if added, false if rejected
+ */
+function safeAddFertilizer(stage, fertilizer, stageIndex, stageTargets, deliveredNutrients, passName) {
+    const fertN = fertilizer.nContributed || fertilizer.n || 0;
+    const fertP = fertilizer.pContributed || fertilizer.p || 0;
+    const fertK = fertilizer.kContributed || fertilizer.k || 0;
+    
+    const fertilizerForCheck = {
+        n: fertN,
+        p: fertP,
+        k: fertK
+    };
+    
+    const check = isFertilizerAllowedInStage(fertilizerForCheck, stageIndex, stageTargets, deliveredNutrients);
+    
+    // Debug log
+    const stageNames = ['Basal', 'Tillering', 'Panicle'];
+    const stageName = stageNames[stageIndex] || `Stage ${stageIndex}`;
+    console.log(`[${passName}] Stage ${stageIndex} (${stageName}): Attempting to add ${fertilizer.name || 'fertilizer'}`);
+    console.log(`  Qty: ${fertilizer.kgs?.toFixed(2) || 'N/A'} kg`);
+    console.log(`  Nutrients: N=${fertN.toFixed(2)}, P=${fertP.toFixed(2)}, K=${fertK.toFixed(2)}`);
+    console.log(`  Stage remaining: N=${((stageTargets.n || 0) - (deliveredNutrients.n || 0)).toFixed(2)}, P=${((stageTargets.p || 0) - (deliveredNutrients.p || 0)).toFixed(2)}, K=${((stageTargets.k || 0) - (deliveredNutrients.k || 0)).toFixed(2)}`);
+    console.log(`  Allowed: ${check.allowed ? 'YES' : 'NO'} - ${check.reason || 'OK'}`);
+    
+    if (!check.allowed) {
+        console.error(`[${passName}] REJECTED: ${check.reason}`);
+        return false;
+    }
+    
+    stage.fertilizers.push(fertilizer);
+    console.log(`[${passName}] ADDED: ${fertilizer.name || 'fertilizer'}`);
+    return true;
+}
+
+/**
+ * Score fertilizer candidate based on constraint compliance
+ * Lower score = better candidate
+ */
+function scoreFertilizerCandidate(candidate, stagePRequired, stageNRequired, stageKRequired, stageIndex) {
+    const nutrients = candidate.nutrients;
+    
+    // REJECT if N/K overflow (should not happen if calculateConstrainedQuantity works correctly)
+    if (nutrients.n > stageNRequired) {
+        return 100000; // Reject - N overflow
+    }
+    if (stageIndex !== 1 && nutrients.k > stageKRequired) {
+        return 100000; // Reject - K overflow
+    }
+    if (stageIndex === 1 && nutrients.k > 0.01) {
+        return 100000; // Reject - K in Tillering
+    }
+    
+    // P must be satisfied
+    if (nutrients.p < stagePRequired * 0.95) {
+        return -1000; // Heavy penalty for not satisfying P
+    }
+    
+    // Score: minimize excess P, maximize N/K utilization within limits
+    const excessP = Math.max(0, nutrients.p - stagePRequired);
+    const nUtilization = nutrients.n / stageNRequired; // Higher is better (up to 1.0)
+    const kUtilization = (stageIndex !== 1 && stageKRequired > 0) ? nutrients.k / stageKRequired : 0;
+    
+    // Lower score = better
+    return excessP * 2.0 - (nUtilization * 0.1) - (kUtilization * 0.1);
+}
+
+/**
+ * Calculate fertilizer recommendation for a single stage using P-first approach
+ * Core principle: Start with P, select complex fertilizer, account for N/K, top up deficits
+ * 
+ * @param {number} stageIndex - Stage index (0=Basal, 1=Tillering, 2=Panicle, etc.)
+ * @param {number} stagePRequired - P requirement for this stage (kg/acre)
+ * @param {number} stageNRequired - N requirement for this stage (kg/acre)
+ * @param {number} stageKRequired - K requirement for this stage (kg/acre)
+ * @param {string} pStatus - P status: 'low', 'medium', 'high'
+ * @param {string} nStatus - N status: 'low', 'medium', 'high'
+ * @param {string} kStatus - K status: 'low', 'medium', 'high'
+ * @param {object} preferences - Fertilizer preferences
+ * @param {string} sStatus - S status
+ * @param {string} phStatus - pH status
+ * @param {object} locationRec - Location recommendations
+ * @param {object} cropData - Crop data with splits
+ * @param {string} stageName - Stage name (e.g., "Basal", "at Tillering")
+ * @returns {object} Stage recommendation with fertilizers and delivered nutrients
+ */
+function calculateStagePFirst(stageIndex, stagePRequired, stageNRequired, stageKRequired,
+                               pStatus, nStatus, kStatus, preferences, sStatus, phStatus,
+                               locationRec, cropData, stageName) {
+    const stage = {
+        stage: stageName,
+        fertilizers: []
+    };
+    
+    // IMMUTABLE: Store original stage targets for constraint validation
+    const originalStageN = stageNRequired;
+    const originalStageP = stagePRequired;
+    const originalStageK = stageKRequired;
+    
+    let remainingN = stageNRequired;
+    let remainingK = stageKRequired;
+    let deliveredP = 0;
+    let deliveredN = 0;
+    let deliveredK = 0;
+    
+    // STEP 1: Select complex fertilizer for P (P-FIRST APPROACH)
+    // Based on P status: LOW = high-P fertilizers, MEDIUM = balanced, HIGH = low-P or P-free
+    let pFertilizer = null;
+    let pFertilizerKgs = 0;
+    let pFertilizerNutrients = { n: 0, p: 0, k: 0, s: 0 };
+    
+    // ENFORCE STAGE RESTRICTIONS (modify working variables, but keep originals for validation)
+    let workingStageP = stagePRequired;
+    let workingStageK = stageKRequired;
+    if (stageIndex === 1) {
+        workingStageK = 0;
+        remainingK = 0;
+    }
+    if (stageIndex === 2) {
+        workingStageP = 0;
+    }
+    
+    // P only at Basal and Tillering, not Stage 3+ (agronomic rule)
+    if (workingStageP > 0 && stageIndex < 2) {
+        console.log(`[P-First Stage] ✓ Stage ${stageIndex} needs P (${stagePRequired.toFixed(2)} kg), entering P selection...`);
+        // Select fertilizer based on P status
+        if (pStatus === 'low') {
+            console.log(`[P-First Stage] P status is LOW, selecting high-P fertilizers...`);
+            // LOW P: Use high-P fertilizers (SSP, 14-35-14, DAP)
+            // Prefer complex fertilizers for bonus N/K
+            const candidates = [];
+            
+            // Try 14-35-14 (high P, provides N and K)
+            if (checkPreference('14-35-14', preferences) !== 'Reject') {
+                try {
+                    console.log(`[P-First Stage] Trying 14-35-14 for ${workingStageP.toFixed(2)} kg P...`);
+                    const constrained = calculateConstrainedQuantity('14-35-14', workingStageP, originalStageN, originalStageK, stageIndex, pStatus, locationRec);
+                    if (constrained && constrained.valid) {
+                        const nutrients = constrained.nutrients;
+                        const score = scoreFertilizerCandidate({ nutrients }, workingStageP, originalStageN, originalStageK, stageIndex);
+                        candidates.push({ product: '14-35-14', method: 'gromor', score, kgs: constrained.quantity, nutrients });
+                        console.log(`[P-First Stage] 14-35-14: added to candidates with score ${score.toFixed(2)}, quantity=${constrained.quantity.toFixed(2)} kg`);
+                    } else {
+                        console.log(`[P-First Stage] 14-35-14: rejected due to constraint violations`);
+                    }
+                } catch (e) {
+                    console.error(`[P-First Stage] ❌ Error with 14-35-14:`, e);
+                }
+            } else {
+                console.log(`[P-First Stage] 14-35-14 is rejected in preferences`);
+            }
+            
+            // Try SSP (precise P, no N/K) - only at basal
+            if (checkPreference('SSP', preferences) !== 'Reject' && stageIndex === 0) {
+                try {
+                    // SSP has no N/K, so it's always safe from constraint perspective
+                    const sspKgs = (workingStageP / 16) * 100;
+                    const rounded = roundToBagPrecise(sspKgs, 50, true);
+                    const actualP = (rounded.kgs * 16) / 100;
+                    const excessP = Math.max(0, actualP - workingStageP);
+                    const score = excessP * 2.0;
+                    candidates.push({ product: 'SSP', method: 'straight', score, kgs: rounded.kgs, 
+                                     nutrients: { n: 0, p: actualP, k: 0, s: (rounded.kgs * 12) / 100 } });
+                } catch (e) {}
+            }
+            
+            // Try 28-28-0 (balanced, provides N)
+            if (checkPreference('28-28-0', preferences) !== 'Reject') {
+                try {
+                    const constrained = calculateConstrainedQuantity('28-28-0', workingStageP, originalStageN, originalStageK, stageIndex, pStatus, locationRec);
+                    if (constrained && constrained.valid) {
+                        const nutrients = constrained.nutrients;
+                        const score = scoreFertilizerCandidate({ nutrients }, workingStageP, originalStageN, originalStageK, stageIndex);
+                        candidates.push({ product: '28-28-0', method: 'gromor', score, kgs: constrained.quantity, nutrients });
+                    }
+                } catch (e) {}
+            }
+            
+            // Select best candidate (lowest score = best)
+            console.log(`[P-First Stage] Total candidates: ${candidates.length}`);
+            if (candidates.length > 0) {
+                candidates.sort((a, b) => a.score - b.score);
+                const best = candidates[0];
+                if (!best.nutrients || best.nutrients.p === undefined) {
+                    console.error(`[P-First Stage] ❌ Best candidate has invalid nutrients:`, best);
+                    throw new Error(`Best candidate has invalid nutrients`);
+                }
+                console.log(`[P-First Stage] ✓ Selected best candidate: ${best.product} (score=${best.score.toFixed(2)}, P=${best.nutrients.p.toFixed(2)} kg)`);
+                pFertilizer = best;
+                pFertilizerKgs = best.kgs;
+                pFertilizerNutrients = best.nutrients;
+            } else {
+                console.warn(`[P-First Stage] ⚠️ No candidates found! Will use SSP fallback...`);
+                // MANDATORY FALLBACK: If no candidates found, use SSP (must meet P requirement)
+                // For paddy, SSP can be used at both Stage 0 (basal) and Stage 1 (tillering)
+                try {
+                    const sspKgs = (workingStageP / 16) * 100;
+                    const rounded = roundToBagPrecise(sspKgs, 50, true);
+                    const actualP = (rounded.kgs * 16) / 100;
+                    pFertilizer = { product: 'SSP', method: 'straight', kgs: rounded.kgs, 
+                                   nutrients: { n: 0, p: actualP, k: 0, s: (rounded.kgs * 12) / 100 } };
+                    pFertilizerKgs = rounded.kgs;
+                    pFertilizerNutrients = pFertilizer.nutrients;
+                    console.log(`[P-First] LOW P: No candidates found, using SSP fallback: ${rounded.kgs.toFixed(2)} kg, P = ${actualP.toFixed(2)} kg`);
+                } catch (e) {
+                    console.error('Failed to add SSP fallback for LOW P:', e);
+                }
+            }
+            
+        } else if (pStatus === 'medium') {
+            // MEDIUM P: Use balanced fertilizers (28-28-0, 20-20-0-13)
+            const candidates = [];
+            
+            // Try 28-28-0
+            if (checkPreference('28-28-0', preferences) !== 'Reject') {
+                try {
+                    const constrained = calculateConstrainedQuantity('28-28-0', workingStageP, originalStageN, originalStageK, stageIndex, pStatus, locationRec);
+                    if (constrained && constrained.valid) {
+                        const nutrients = constrained.nutrients;
+                        const score = scoreFertilizerCandidate({ nutrients }, workingStageP, originalStageN, originalStageK, stageIndex);
+                        candidates.push({ product: '28-28-0', method: 'gromor', score, kgs: constrained.quantity, nutrients });
+                    }
+                } catch (e) {}
+            }
+            
+            // Try 20-20-0-13 (for stage 2)
+            if (stageIndex === 1 && checkPreference('20-20-0-13', preferences) !== 'Reject') {
+                try {
+                    const constrained = calculateConstrainedQuantity('20-20-0-13', workingStageP, originalStageN, originalStageK, stageIndex, pStatus, locationRec);
+                    if (constrained && constrained.valid) {
+                        const nutrients = constrained.nutrients;
+                        const score = scoreFertilizerCandidate({ nutrients }, workingStageP, originalStageN, originalStageK, stageIndex);
+                        candidates.push({ product: '20-20-0-13', method: 'gromor', score, kgs: constrained.quantity, nutrients });
+                    }
+                } catch (e) {}
+            }
+            
+            if (candidates.length > 0) {
+                candidates.sort((a, b) => a.score - b.score);
+                const best = candidates[0];
+                pFertilizer = best;
+                pFertilizerKgs = best.kgs;
+                pFertilizerNutrients = best.nutrients;
+            } else {
+                // MANDATORY FALLBACK: If no candidates found, use SSP (must meet P requirement)
+                // For paddy, SSP can be used at both Stage 0 (basal) and Stage 1 (tillering)
+                try {
+                    const sspKgs = (workingStageP / 16) * 100;
+                    const rounded = roundToBagPrecise(sspKgs, 50, true);
+                    const actualP = (rounded.kgs * 16) / 100;
+                    pFertilizer = { product: 'SSP', method: 'straight', kgs: rounded.kgs, 
+                                   nutrients: { n: 0, p: actualP, k: 0, s: (rounded.kgs * 12) / 100 } };
+                    pFertilizerKgs = rounded.kgs;
+                    pFertilizerNutrients = pFertilizer.nutrients;
+                    console.log(`[P-First] MEDIUM P: No candidates found, using SSP fallback: ${rounded.kgs.toFixed(2)} kg, P = ${actualP.toFixed(2)} kg`);
+                } catch (e) {
+                    console.error('Failed to add SSP fallback for MEDIUM P:', e);
+                }
+            }
+            
+        } else if (pStatus === 'high') {
+            // HIGH P: Use P-free or low-P fertilizers
+            // If stage needs P, use minimal low-P fertilizer, otherwise skip P
+            if (workingStageP > 0) {
+                // Try low-P fertilizers only
+                if (checkPreference('16-20-0-13', preferences) !== 'Reject') {
+                    try {
+                        const constrained = calculateConstrainedQuantity('16-20-0-13', workingStageP, originalStageN, originalStageK, stageIndex, pStatus, locationRec);
+                        if (constrained && constrained.valid) {
+                            pFertilizer = { product: '16-20-0-13', method: 'gromor', kgs: constrained.quantity, nutrients: constrained.nutrients };
+                            pFertilizerKgs = constrained.quantity;
+                            pFertilizerNutrients = constrained.nutrients;
+                        }
+                    } catch (e) {}
+                }
+            }
+            // If no P fertilizer selected, we'll skip P (soil already has high P)
+        }
+        
+        // Add P fertilizer to stage if selected
+        // CRITICAL: If stagePRequired > 0 but no pFertilizer selected, force SSP (mandatory)
+        // This applies to BOTH Stage 0 (basal) and Stage 1 (tillering) for paddy
+        if (!pFertilizer && workingStageP > 0 && stageIndex < 2) {
+            // MANDATORY: Force SSP if no P fertilizer was selected (for both Stage 0 and Stage 1)
+            console.warn(`[P-First] No P fertilizer selected for Stage ${stageIndex} (${stageName}), forcing SSP. P required: ${workingStageP} kg`);
+            try {
+                const sspKgs = (workingStageP / 16) * 100;
+                const rounded = roundToBagPrecise(sspKgs, 50, true);
+                const actualP = (rounded.kgs * 16) / 100;
+                pFertilizer = { product: 'SSP', method: 'straight', kgs: rounded.kgs, 
+                               nutrients: { n: 0, p: actualP, k: 0, s: (rounded.kgs * 12) / 100 } };
+                pFertilizerKgs = rounded.kgs;
+                pFertilizerNutrients = pFertilizer.nutrients;
+                console.log(`[P-First] Forced SSP: ${rounded.kgs.toFixed(2)} kg, P = ${actualP.toFixed(2)} kg`);
+            } catch (e) {
+                console.error(`[P-First] Failed to force SSP:`, e);
+            }
+        }
+        
+        if (pFertilizer) {
+            console.log(`[P-First] ✓ Stage ${stageIndex}: Selected ${pFertilizer.product || pFertilizer.method}, P = ${pFertilizerNutrients.p.toFixed(2)} kg`);
+            const fertilizerName = pFertilizer.method === 'gromor' 
+                ? `Gromor ${pFertilizer.product}` 
+                : pFertilizer.product;
+            
+            const bagSize = 50; // All non-Urea = 50kg
+            const bags = pFertilizerKgs / bagSize;
+            
+            const pContributed = pFertilizerNutrients.p;
+            const nContributed = pFertilizerNutrients.n;
+            const kContributed = pFertilizerNutrients.k;
+            
+            console.log(`[P-First] Adding fertilizer to stage: ${fertilizerName}, kgs=${pFertilizerKgs.toFixed(2)}, P=${pContributed.toFixed(2)}, N=${nContributed.toFixed(2)}, K=${kContributed.toFixed(2)}`);
+            
+            const fertilizerObj = {
+                name: fertilizerName,
+                kgs: pFertilizerKgs,
+                bags: bags,
+                fullBags: Math.floor(bags),
+                remainder: pFertilizerKgs % bagSize,
+                nContributed: nContributed,
+                pContributed: pContributed,
+                kContributed: kContributed,
+                sContributed: pFertilizerNutrients.s || 0
+            };
+            
+            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+            const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+            
+            // Use safeAddFertilizer wrapper
+            const added = safeAddFertilizer(stage, fertilizerObj, stageIndex, stageTargets, deliveredBefore, 'P-first-initial');
+            
+            if (added) {
+                deliveredP = pContributed;
+                console.log(`[P-First] ✓ Stage ${stageIndex} deliveredP set to: ${deliveredP.toFixed(2)} kg`);
+                deliveredN += pFertilizerNutrients.n;
+                deliveredK += pFertilizerNutrients.k;
+            } else {
+                console.error(`[P-First] ❌ Failed to add P fertilizer - constraint violation!`);
+            }
+            
+            // Adjust remaining N and K
+            remainingN = Math.max(0, originalStageN - pFertilizerNutrients.n);
+            remainingK = Math.max(0, originalStageK - pFertilizerNutrients.k);
+            
+            // CRITICAL: Re-enforce K=0 in Tillering after P fertilizer addition
+            if (stageIndex === 1) {
+                remainingK = 0;
+                if (pFertilizerNutrients.k > 0.01) {
+                    console.error(`[P-First] ERROR: P fertilizer ${pFertilizer.product} contains K=${pFertilizerNutrients.k.toFixed(2)} in Tillering stage! This should have been rejected.`);
+                }
+            }
+        }
+    }
+    
+    // STEP 2: Top up N with Urea (if needed and within stage cap)
+    // Detect single-nutrient mode: N-only top-up when P and K are already satisfied
+    const remainingP = Math.max(0, originalStageP - deliveredP);
+    const isSingleNutrientNMode = remainingN > 0 && remainingP <= 0.1 && remainingK <= 0.1;
+    if (remainingN > 0 && stage.fertilizers.length < 3) { // Max 3 products per stage
+        const nFertilizer = selectNFertilizerForSingleNutrientTopUp(remainingN, preferences, sStatus, phStatus, isSingleNutrientNMode);
+        if (nFertilizer) {
+            const nKgs = convertNToStraight(remainingN, nFertilizer.toLowerCase());
+            const bagSize = nFertilizer === 'Urea' ? 45 : 50; // Urea = 45kg, others = 50kg
+            const rounded = roundToBagPrecise(nKgs, bagSize, true); // Round UP for N
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+            
+            // CONSTRAINT CHECK: Ensure adding this fertilizer won't exceed stage N limit
+            const totalNAfter = deliveredN + actualNutrients.n;
+            if (totalNAfter > originalStageN) {
+                // Cap the quantity to stay within stage limit
+                const maxAllowedN = originalStageN - deliveredN;
+                if (maxAllowedN <= 0) {
+                    console.warn(`[P-First] Stage ${stageIndex}: Cannot add N fertilizer - would exceed stage N limit (${originalStageN.toFixed(2)} kg)`);
+                } else {
+                    // Recalculate with capped quantity
+                    const cappedKgs = convertNToStraight(maxAllowedN, nFertilizer.toLowerCase());
+                    const cappedRounded = roundToBagPrecise(cappedKgs, bagSize, true);
+                    const cappedNutrients = getNutrientsFromStraight(cappedRounded.kgs, nFertilizer);
+                    
+                    // Final check: ensure capped quantity still doesn't exceed limit
+                    if (deliveredN + cappedNutrients.n <= originalStageN) {
+                        const fertilizerObj = {
+                            name: nFertilizer,
+                            kgs: cappedRounded.kgs,
+                            bags: cappedRounded.bags,
+                            fullBags: cappedRounded.fullBags,
+                            remainder: cappedRounded.remainder,
+                            nContributed: cappedNutrients.n,
+                            pContributed: cappedNutrients.p || 0,
+                            kContributed: cappedNutrients.k || 0
+                        };
+                        
+                        const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                        const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                        
+                        if (safeAddFertilizer(stage, fertilizerObj, stageIndex, stageTargets, deliveredBefore, 'N-topup-capped')) {
+                            deliveredN += cappedNutrients.n;
+                            remainingN = Math.max(0, originalStageN - deliveredN);
+                            console.log(`[P-First] Stage ${stageIndex}: Capped N fertilizer to ${cappedRounded.kgs.toFixed(2)} kg to respect stage limit`);
+                        }
+                    }
+                }
+            } else {
+                // Safe to add full quantity
+                const fertilizerObj = {
+                    name: nFertilizer,
+                    kgs: rounded.kgs,
+                    bags: rounded.bags,
+                    fullBags: rounded.fullBags,
+                    remainder: rounded.remainder,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, stageIndex, stageTargets, deliveredBefore, 'N-topup-full')) {
+                    deliveredN += actualNutrients.n;
+                    remainingN = Math.max(0, originalStageN - deliveredN);
+                }
+            }
+        }
+    }
+    
+    // STEP 3: Top up K with MOP/SOP (if needed and threshold allows)
+    // CRITICAL: K is NOT allowed in Tillering stage (stageIndex === 1)
+    // K threshold rule: If complex fertilizer already provides 35-40% of stage K, don't add MOP
+    const kFromComplex = deliveredK;
+    const kPercentFromComplex = originalStageK > 0 ? (kFromComplex / originalStageK) * 100 : 0;
+    
+    // STRICT ENFORCEMENT: Do NOT add K fertilizers in Tillering stage
+    if (stageIndex === 1) {
+        console.log(`[P-First] Stage ${stageIndex} (Tillering): Skipping K top-up - K not allowed in this stage`);
+        remainingK = 0; // Ensure remainingK is 0
+        // Do not add any K fertilizers
+    } else if (remainingK > 0 && kPercentFromComplex < 35 && stage.fertilizers.length < 3) {
+        // Detect single-nutrient mode: K-only top-up when N and P are already satisfied
+        const remainingP = Math.max(0, originalStageP - deliveredP);
+        const isSingleNutrientKMode = remainingK > 0 && remainingN <= 0.1 && remainingP <= 0.1;
+        const kFertilizer = selectKFertilizerForSingleNutrientTopUp(remainingK, preferences, sStatus, phStatus, isSingleNutrientKMode);
+        if (kFertilizer) {
+            const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+            const bagSize = 50; // K fertilizers = 50kg
+            const rounded = roundToBagPrecise(kKgs, bagSize, false); // Round to nearest for K
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+            
+            // CONSTRAINT CHECK: Ensure adding this fertilizer won't exceed stage K limit
+            const totalKAfter = deliveredK + actualNutrients.k;
+            if (totalKAfter > originalStageK) {
+                // Cap the quantity to stay within stage limit
+                const maxAllowedK = originalStageK - deliveredK;
+                if (maxAllowedK <= 0) {
+                    console.warn(`[P-First] Stage ${stageIndex}: Cannot add K fertilizer - would exceed stage K limit (${originalStageK.toFixed(2)} kg)`);
+                } else {
+                    // Recalculate with capped quantity
+                    const cappedKgs = convertK2OToStraight(maxAllowedK, kFertilizer.toLowerCase());
+                    const cappedRounded = roundToBagPrecise(cappedKgs, bagSize, false);
+                    const cappedNutrients = getNutrientsFromStraight(cappedRounded.kgs, kFertilizer);
+                    
+                    // Final check: ensure capped quantity still doesn't exceed limit
+                    if (deliveredK + cappedNutrients.k <= originalStageK) {
+                        const fertilizerObj = {
+                            name: kFertilizer,
+                            kgs: cappedRounded.kgs,
+                            bags: cappedRounded.bags,
+                            fullBags: cappedRounded.fullBags,
+                            remainder: cappedRounded.remainder,
+                            nContributed: cappedNutrients.n || 0,
+                            pContributed: cappedNutrients.p || 0,
+                            kContributed: cappedNutrients.k
+                        };
+                        
+                        const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                        const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                        
+                        if (safeAddFertilizer(stage, fertilizerObj, stageIndex, stageTargets, deliveredBefore, 'K-topup-capped')) {
+                            deliveredK += cappedNutrients.k;
+                            remainingK = Math.max(0, originalStageK - deliveredK);
+                            console.log(`[P-First] Stage ${stageIndex}: Capped K fertilizer to ${cappedRounded.kgs.toFixed(2)} kg to respect stage limit`);
+                        }
+                    }
+                }
+            } else {
+                // Safe to add full quantity
+                const fertilizerObj = {
+                    name: kFertilizer,
+                    kgs: rounded.kgs,
+                    bags: rounded.bags,
+                    fullBags: rounded.fullBags,
+                    remainder: rounded.remainder,
+                    nContributed: actualNutrients.n || 0,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k
+                };
+                
+                const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, stageIndex, stageTargets, deliveredBefore, 'K-topup-full')) {
+                    deliveredK += actualNutrients.k;
+                    remainingK = Math.max(0, originalStageK - deliveredK);
+                }
+            }
+        }
+    }
+    
+    // Calculate totals
+    const totalN = deliveredN;
+    const totalP = deliveredP;
+    const totalK = deliveredK;
+    
+    // ============================================================================
+    // FINAL VALIDATION: Check stage constraints after ALL fertilizers are added
+    // ============================================================================
+    if (stageIndex === 1 && totalK > 0.01) {
+        console.error(`[P-First] ERROR: Stage ${stageIndex} (Tillering) has K=${totalK.toFixed(2)}, should be 0!`);
+        // Force K to 0 by removing K contributions (safety measure)
+        // Note: This should not happen if constraints are properly enforced
+    }
+    
+    if (stageIndex === 2 && totalP > 0.01) {
+        console.error(`[P-First] ERROR: Stage ${stageIndex} (Panicle) has P=${totalP.toFixed(2)}, should be 0!`);
+    }
+    
+    // STRICT VALIDATION: N must NOT exceed stage limit (use original targets)
+    if (totalN > originalStageN) {
+        console.error(`[P-First] ERROR: Stage ${stageIndex} N OVERFLOW: ${totalN.toFixed(2)} > ${originalStageN.toFixed(2)} - VIOLATION!`);
+    }
+    
+    if (stageIndex !== 1 && totalK > originalStageK) {
+        console.error(`[P-First] ERROR: Stage ${stageIndex} K OVERFLOW: ${totalK.toFixed(2)} > ${originalStageK.toFixed(2)} - VIOLATION!`);
+    }
+    
+    const result = {
+        stage: stage,
+        deliveredN: totalN,
+        deliveredP: totalP,
+        deliveredK: totalK,
+        remainingN: Math.max(0, originalStageN - totalN),
+        remainingP: Math.max(0, originalStageP - totalP),
+        remainingK: Math.max(0, originalStageK - totalK)
+    };
+    
+    // DEBUG: Log final return values
+    console.log(`[P-First] Stage ${stageIndex} RETURN: deliveredP=${result.deliveredP.toFixed(2)}, deliveredN=${result.deliveredN.toFixed(2)}, deliveredK=${result.deliveredK.toFixed(2)}`);
+    console.log(`[P-First] Stage ${stageIndex} fertilizers count: ${result.stage.fertilizers.length}`);
+    result.stage.fertilizers.forEach((fert, idx) => {
+        console.log(`  [${idx}] ${fert.name}: P=${(fert.pContributed || 0).toFixed(2)}, N=${(fert.nContributed || 0).toFixed(2)}, K=${(fert.kContributed || 0).toFixed(2)}`);
+    });
+    
+    return result;
+}
+
+/**
+ * NEW REDESIGN: Complete P-first calculation with tolerance and compensation
+ * This function calculates all stages using P-first approach with:
+ * - P status-based fertilizer selection
+ * - K threshold logic (35-40% rule)
+ * - Stage-wise ±10% tolerance
+ * - Overall max 5% excess, no deficit
+ * - Stage compensation (+10%/-10% preferred)
+ * - Max 3 products per stage
+ */
+function calculatePFirstComplete(cropData, nPerSplit, kPerSplit, pPerSplit, 
+                                  pStatus, nStatus, kStatus, preferences, 
+                                  sStatus, phStatus, locationRec) {
+    const recommendations = [];
+    const totalNRequired = nPerSplit.reduce((sum, n) => sum + n, 0);
+    const totalPRequired = pPerSplit.reduce((sum, p) => sum + p, 0);
+    const totalKRequired = kPerSplit.reduce((sum, k) => sum + k, 0);
+    
+    // DEBUG: Log input parameters
+    console.log('[P-First Complete] INPUT:', {
+        totalPRequired: totalPRequired.toFixed(2),
+        pPerSplit: pPerSplit.map(p => p.toFixed(2)),
+        pStatus: pStatus,
+        nStatus: nStatus,
+        kStatus: kStatus,
+        preferences: Object.keys(preferences).length + ' preferences'
+    });
+    
+    let cumulativeN = 0, cumulativeP = 0, cumulativeK = 0;
+    
+    // Calculate all stages using P-first approach
+    for (let i = 0; i < nPerSplit.length; i++) {
+        const stageName = cropData.splits.n.stages[i] || `Stage ${i + 1}`;
+        const stagePRequired = pPerSplit[i] || 0;
+        const stageNRequired = nPerSplit[i] || 0;
+        const stageKRequired = kPerSplit[i] || 0;
+        
+        // STRICT: Use original stage targets (no rebalancing to compensate for earlier deficits)
+        // Stage-wise split rules must be respected: N=1/3 per stage, P=60/40/0, K=50/0/50
+        const finalStageN = stageNRequired; // Strict 1/3 rule - no adjustment
+        const finalStageP = stagePRequired; // Use original P split (60/40/0)
+        const finalStageK = stageKRequired; // Use original K split (50/0/50)
+        
+        // Calculate stage using P-first approach with strict stage targets
+        const stageResult = calculateStagePFirst(
+            i, finalStageP, finalStageN, finalStageK,
+            pStatus, nStatus, kStatus, preferences,
+            sStatus, phStatus, locationRec, cropData, stageName
+        );
+        
+        // DEBUG: Log what was delivered
+        if (stageResult.deliveredP > 0) {
+            console.log(`[P-First Complete] Stage ${i} delivered: N=${stageResult.deliveredN.toFixed(2)}, P=${stageResult.deliveredP.toFixed(2)}, K=${stageResult.deliveredK.toFixed(2)}`);
+        } else if (stagePRequired > 0) {
+            console.error(`[P-First Complete] ERROR: Stage ${i} required P=${stagePRequired.toFixed(2)} but delivered 0!`);
+        }
+        
+        // Update cumulative totals
+        cumulativeN += stageResult.deliveredN;
+        cumulativeP += stageResult.deliveredP;
+        cumulativeK += stageResult.deliveredK;
+        
+        console.log(`[P-First Complete] After Stage ${i}: cumulativeN=${cumulativeN.toFixed(2)}, cumulativeP=${cumulativeP.toFixed(2)}, cumulativeK=${cumulativeK.toFixed(2)}`);
+        
+        recommendations.push(stageResult.stage);
+    }
+    
+    // FINAL VALIDATION: Report deficits but DO NOT add fertilizers (respects stage constraints)
+    // Overall tolerance: max 5% excess, no deficit
+    const maxAllowedN = totalNRequired * 1.05; // 5% excess max
+    const maxAllowedP = totalPRequired * 1.05;
+    const maxAllowedK = totalKRequired * 1.05;
+    
+    console.log(`[P-First Complete] Final validation: cumulativeN=${cumulativeN.toFixed(2)}, cumulativeP=${cumulativeP.toFixed(2)}, cumulativeK=${cumulativeK.toFixed(2)}`);
+    console.log(`[P-First Complete] Required: totalN=${totalNRequired.toFixed(2)}, totalP=${totalPRequired.toFixed(2)}, totalK=${totalKRequired.toFixed(2)}`);
+    
+    // Report deficits but do not add fertilizers (stage constraints must be respected)
+    const validationReport = {
+        nDeficit: Math.max(0, totalNRequired - cumulativeN),
+        pDeficit: Math.max(0, totalPRequired - cumulativeP),
+        kDeficit: Math.max(0, totalKRequired - cumulativeK),
+        nExcess: Math.max(0, cumulativeN - maxAllowedN),
+        pExcess: Math.max(0, cumulativeP - maxAllowedP),
+        kExcess: Math.max(0, cumulativeK - maxAllowedK),
+        passed: true,
+        warnings: []
+    };
+    
+    if (validationReport.nDeficit > 0) {
+        validationReport.passed = false;
+        validationReport.warnings.push(`N deficit: ${validationReport.nDeficit.toFixed(2)} kg (cannot add without violating stage constraints)`);
+        console.warn(`[P-First Complete] ⚠️ N DEFICIT: ${validationReport.nDeficit.toFixed(2)} kg - Stage constraints prevent adding more`);
+    }
+    if (validationReport.pDeficit > 0) {
+        validationReport.passed = false;
+        validationReport.warnings.push(`P deficit: ${validationReport.pDeficit.toFixed(2)} kg (cannot add without violating stage constraints)`);
+        console.warn(`[P-First Complete] ⚠️ P DEFICIT: ${validationReport.pDeficit.toFixed(2)} kg - Stage constraints prevent adding more`);
+    }
+    if (validationReport.kDeficit > 0) {
+        validationReport.passed = false;
+        validationReport.warnings.push(`K deficit: ${validationReport.kDeficit.toFixed(2)} kg (cannot add without violating stage constraints)`);
+        console.warn(`[P-First Complete] ⚠️ K DEFICIT: ${validationReport.kDeficit.toFixed(2)} kg - Stage constraints prevent adding more`);
+    }
+    if (validationReport.nExcess > 0) {
+        validationReport.warnings.push(`N excess: ${validationReport.nExcess.toFixed(2)} kg (exceeds 5% tolerance)`);
+        console.warn(`[P-First Complete] ⚠️ N EXCESS: ${validationReport.nExcess.toFixed(2)} kg (exceeds 5% tolerance)`);
+    }
+    if (validationReport.pExcess > 0) {
+        validationReport.warnings.push(`P excess: ${validationReport.pExcess.toFixed(2)} kg (exceeds 5% tolerance)`);
+        console.warn(`[P-First Complete] ⚠️ P EXCESS: ${validationReport.pExcess.toFixed(2)} kg (exceeds 5% tolerance)`);
+    }
+    if (validationReport.kExcess > 0) {
+        validationReport.warnings.push(`K excess: ${validationReport.kExcess.toFixed(2)} kg (exceeds 5% tolerance)`);
+        console.warn(`[P-First Complete] ⚠️ K EXCESS: ${validationReport.kExcess.toFixed(2)} kg (exceeds 5% tolerance)`);
+    }
+    
+    // Store validation report in recommendations (for UI display)
+    if (recommendations.length > 0) {
+        recommendations.validationReport = validationReport;
+    }
+    
+    return recommendations;
+}
+
+// Stage-safe top-up pass: Fill remaining headroom in each stage using single fertilizers
+// This improves quota closure while respecting stage constraints AND global quotas
+function applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, combinationName) {
+    if (!recommendations || recommendations.length === 0) return;
+    
+    // Calculate total required nutrients
+    const totalNRequired = nPerSplit.reduce((sum, n) => sum + n, 0);
+    const totalPRequired = pPerSplit.reduce((sum, p) => sum + p, 0);
+    const totalKRequired = kPerSplit.reduce((sum, k) => sum + k, 0);
+    
+    // Helper function to compute global delivered totals
+    const computeGlobalDelivered = () => {
+        let globalN = 0, globalP = 0, globalK = 0;
+        recommendations.forEach(stage => {
+            if (stage && stage.fertilizers) {
+                stage.fertilizers.forEach(fert => {
+                    globalN += fert.nContributed || 0;
+                    globalP += fert.pContributed || 0;
+                    globalK += fert.kContributed || 0;
+                });
+            }
+        });
+        return { n: globalN, p: globalP, k: globalK };
+    };
+    
+    // Compute initial global delivered and remaining
+    let globalDelivered = computeGlobalDelivered();
+    let globalRemainingN = Math.max(0, totalNRequired - globalDelivered.n);
+    let globalRemainingP = Math.max(0, totalPRequired - globalDelivered.p);
+    let globalRemainingK = Math.max(0, totalKRequired - globalDelivered.k);
+    
+    // Helper: re-read delivered nutrients for a stage from its current fertilizers
+    const getStageDelivered = (idx) => {
+        const s = recommendations[idx];
+        let n = 0, p = 0, k = 0;
+        if (s && s.fertilizers) {
+            s.fertilizers.forEach(f => {
+                n += f.nContributed || 0;
+                p += f.pContributed || 0;
+                k += f.kContributed || 0;
+            });
+        }
+        return { n, p, k };
+    };
+
+    // Build list of valid stage indices
+    const stageIndices = recommendations
+        .map((s, i) => i)
+        .filter(i => i < nPerSplit.length && recommendations[i] && recommendations[i].fertilizers);
+
+    // ── PASS 1: N top-up — most N-underfilled stage first ───────────────────────────────
+    if (globalRemainingN > 0.1) {
+        const nOrder = [...stageIndices].sort((a, b) => {
+            // Relative fill shortfall: stages further below target (as %) come first.
+            // Stages above target get a negative shortfall → pushed to end (strong penalty).
+            const tA = nPerSplit[a] || 0;
+            const tB = nPerSplit[b] || 0;
+            const defA = tA > 0 ? (tA - getStageDelivered(a).n) / tA : 0;
+            const defB = tB > 0 ? (tB - getStageDelivered(b).n) / tB : 0;
+            return defB - defA; // descending: most-underfilled (by %) first
+        });
+
+        for (const stageIdx of nOrder) {
+            if (globalRemainingN <= 0.1) break;
+
+            const stage = recommendations[stageIdx];
+            const delivered = getStageDelivered(stageIdx);
+            const deliveredN = delivered.n;
+            const stageTargetN = nPerSplit[stageIdx] || 0;
+
+            // Skip stages already at or above their target
+            if (deliveredN >= stageTargetN * 0.98) continue; // skip if within 2% of target
+
+            const nHeadroom = Math.max(0, stageTargetN * 1.12 - deliveredN);
+            if (nHeadroom <= 0.5) continue;
+
+            const stageTargets  = { n: stageTargetN, p: pPerSplit[stageIdx] || 0, k: kPerSplit[stageIdx] || 0 };
+            const deliveredBefore = { n: deliveredN, p: delivered.p, k: delivered.k };
+
+            // Detect single-nutrient mode: N-only top-up when P and K are already satisfied
+            const pHeadroom = Math.max(0, (pPerSplit[stageIdx] || 0) * 1.12 - delivered.p);
+            const kHeadroom = Math.max(0, (kPerSplit[stageIdx] || 0) * 1.12 - delivered.k);
+            const isSingleNutrientNMode = nHeadroom > 0.5 && pHeadroom <= 0.1 && kHeadroom <= 0.5;
+            
+            let nFertilizer = selectNFertilizerForSingleNutrientTopUp(Math.min(nHeadroom, globalRemainingN), preferences, sStatus, phStatus, isSingleNutrientNMode);
+            if (!nFertilizer) nFertilizer = 'Urea';
+
+            const nToAdd = Math.min(nHeadroom, globalRemainingN, stageTargetN * 1.12 - deliveredN);
+            if (nToAdd <= 0.1) continue;
+
+            const nKgs    = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+            const rounded = roundToBag(nKgs);
+
+            if (rounded.kgs <= 0) {
+                console.log(`[${combinationName}-topup] Stage ${stageIdx} N: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
+                continue;
+            }
+
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+            if (deliveredN + actualNutrients.n <= stageTargetN * 1.12 &&
+                globalDelivered.n + actualNutrients.n <= totalNRequired) {
+                const fertilizerObj = {
+                    name: nFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k || 0
+                };
+                console.log(`[${combinationName}-topup] Stage ${stageIdx} N: headroom=${nHeadroom.toFixed(2)}, globalRemaining=${globalRemainingN.toFixed(2)}, chosenTopUp=${nToAdd.toFixed(2)}, roundedQty=${rounded.kgs.toFixed(2)}, actualN=${actualNutrients.n.toFixed(2)}`);
+                if (safeAddFertilizer(stage, fertilizerObj, stageIdx, stageTargets, deliveredBefore, `${combinationName}-topup-N`)) {
+                    globalDelivered.n += actualNutrients.n;
+                    globalRemainingN   = Math.max(0, totalNRequired - globalDelivered.n);
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} N: ACCEPTED - new globalRemaining=${globalRemainingN.toFixed(2)}`);
+                } else {
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} N: REJECTED - constraint violation`);
+                }
+            } else {
+                console.log(`[${combinationName}-topup] Stage ${stageIdx} N: REJECTED - would exceed stage cap or global quota`);
+            }
+        }
+    }
+
+    // ── PASS 2: P top-up — most P-underfilled stage first (Panicle forbidden) ──────────
+    if (globalRemainingP > 0.1) {
+        const pOrder = [...stageIndices]
+            .filter(i => i !== 2) // Panicle: P application forbidden
+            .sort((a, b) => {
+                const tA = pPerSplit[a] || 0;
+                const tB = pPerSplit[b] || 0;
+                const defA = tA > 0 ? (tA - getStageDelivered(a).p) / tA : 0;
+                const defB = tB > 0 ? (tB - getStageDelivered(b).p) / tB : 0;
+                return defB - defA; // most-underfilled (by %) first; above-target → negative → last
+            });
+
+        for (const stageIdx of pOrder) {
+            if (globalRemainingP <= 0.1) break;
+
+            const stage = recommendations[stageIdx];
+            const delivered = getStageDelivered(stageIdx);
+            const deliveredP = delivered.p;
+            const stageTargetP = pPerSplit[stageIdx] || 0;
+
+            // Skip stages already at or above their target
+            if (deliveredP >= stageTargetP * 0.98) continue; // skip if within 2% of target
+
+            const pHeadroom = Math.max(0, stageTargetP * 1.12 - deliveredP);
+            if (pHeadroom <= 0.1) continue;
+
+            const stageTargets  = { n: nPerSplit[stageIdx] || 0, p: stageTargetP, k: kPerSplit[stageIdx] || 0 };
+            const deliveredBefore = { n: delivered.n, p: deliveredP, k: delivered.k };
+
+            // Detect single-nutrient mode: P-only top-up when N and K are already satisfied
+            const nHeadroom = Math.max(0, (nPerSplit[stageIdx] || 0) * 1.12 - delivered.n);
+            const kHeadroom = Math.max(0, (kPerSplit[stageIdx] || 0) * 1.12 - delivered.k);
+            const isSingleNutrientPMode = pHeadroom > 0.1 && nHeadroom <= 0.5 && kHeadroom <= 0.5;
+
+            const pToAdd = Math.min(pHeadroom, globalRemainingP, stageTargetP * 1.12 - deliveredP);
+            if (pToAdd <= 0.1) continue;
+
+            // Use single-nutrient preference: SSP first, then DAP
+            const pFertilizer = selectPFertilizerForSingleNutrientTopUp(
+                pToAdd, preferences, stageIdx, stageTargets.n, delivered.n, isSingleNutrientPMode
+            );
+
+            if (pFertilizer === 'SSP') {
+                const sspKgs  = (pToAdd / 16) * 100;
+                const rounded = roundToBag(sspKgs);
+
+                if (rounded.kgs <= 0) {
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
+                    continue;
+                }
+
+                const actualP = (rounded.kgs * 16) / 100;
+                const actualS = (rounded.kgs * 12) / 100;
+                if (deliveredP + actualP <= stageTargetP * 1.12 &&
+                    globalDelivered.p + actualP <= totalPRequired) {
+                    const fertilizerObj = {
+                        name: 'SSP',
+                        kgs: rounded.kgs,
+                        bags: rounded.kgs / 50,
+                        fullBags: Math.floor(rounded.kgs / 50),
+                        remainder: rounded.kgs % 50,
+                        nContributed: 0,
+                        pContributed: actualP,
+                        kContributed: 0,
+                        sContributed: actualS
+                    };
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P (SSP): headroom=${pHeadroom.toFixed(2)}, globalRemaining=${globalRemainingP.toFixed(2)}, chosenTopUp=${pToAdd.toFixed(2)}, roundedQty=${rounded.kgs.toFixed(2)}, actualP=${actualP.toFixed(2)}`);
+                    if (safeAddFertilizer(stage, fertilizerObj, stageIdx, stageTargets, deliveredBefore, `${combinationName}-topup-P`)) {
+                        globalDelivered.p += actualP;
+                        globalRemainingP   = Math.max(0, totalPRequired - globalDelivered.p);
+                        console.log(`[${combinationName}-topup] Stage ${stageIdx} P: ACCEPTED - new globalRemaining=${globalRemainingP.toFixed(2)}`);
+                    } else {
+                        console.log(`[${combinationName}-topup] Stage ${stageIdx} P: REJECTED - constraint violation`);
+                    }
+                } else {
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P: REJECTED - would exceed stage cap or global quota`);
+                }
+            } else if (pFertilizer === 'DAP') {
+                // DAP: 18% N, 46% P2O5
+                const dapKgs = (pToAdd / 46) * 100;
+                const rounded = roundToBag(dapKgs);
+
+                if (rounded.kgs <= 0) {
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
+                    continue;
+                }
+
+                const actualP = (rounded.kgs * 46) / 100;
+                const actualN = (rounded.kgs * 18) / 100;
+                
+                // Check if rounded quantity fits in headroom and doesn't violate N cap
+                if (deliveredP + actualP <= stageTargetP * 1.12 &&
+                    delivered.n + actualN <= stageTargets.n * 1.12 &&
+                    globalDelivered.p + actualP <= totalPRequired &&
+                    globalDelivered.n + actualN <= totalNRequired) {
+                    const fertilizerObj = {
+                        name: 'DAP',
+                        kgs: rounded.kgs,
+                        bags: rounded.kgs / 50,
+                        fullBags: Math.floor(rounded.kgs / 50),
+                        remainder: rounded.kgs % 50,
+                        nContributed: actualN,
+                        pContributed: actualP,
+                        kContributed: 0
+                    };
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P (DAP): headroom=${pHeadroom.toFixed(2)}, globalRemaining=${globalRemainingP.toFixed(2)}, chosenTopUp=${pToAdd.toFixed(2)}, roundedQty=${rounded.kgs.toFixed(2)}, actualP=${actualP.toFixed(2)}, actualN=${actualN.toFixed(2)}`);
+                    if (safeAddFertilizer(stage, fertilizerObj, stageIdx, stageTargets, deliveredBefore, `${combinationName}-topup-P`)) {
+                        globalDelivered.p += actualP;
+                        globalDelivered.n += actualN;
+                        globalRemainingP = Math.max(0, totalPRequired - globalDelivered.p);
+                        globalRemainingN = Math.max(0, totalNRequired - globalDelivered.n);
+                        console.log(`[${combinationName}-topup] Stage ${stageIdx} P: ACCEPTED - new globalRemaining P=${globalRemainingP.toFixed(2)}, N=${globalRemainingN.toFixed(2)}`);
+                    } else {
+                        console.log(`[${combinationName}-topup] Stage ${stageIdx} P: REJECTED - constraint violation`);
+                    }
+                } else {
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P: REJECTED - would exceed stage cap or global quota`);
+                }
+            } else {
+                // Fallback: use SSP if no preference selected
+                const sspKgs  = (pToAdd / 16) * 100;
+                const rounded = roundToBag(sspKgs);
+
+                if (rounded.kgs <= 0) {
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
+                    continue;
+                }
+
+                const actualP = (rounded.kgs * 16) / 100;
+                const actualS = (rounded.kgs * 12) / 100;
+                if (deliveredP + actualP <= stageTargetP * 1.12 &&
+                    globalDelivered.p + actualP <= totalPRequired) {
+                    const fertilizerObj = {
+                        name: 'SSP',
+                        kgs: rounded.kgs,
+                        bags: rounded.kgs / 50,
+                        fullBags: Math.floor(rounded.kgs / 50),
+                        remainder: rounded.kgs % 50,
+                        nContributed: 0,
+                        pContributed: actualP,
+                        kContributed: 0,
+                        sContributed: actualS
+                    };
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P (SSP fallback): headroom=${pHeadroom.toFixed(2)}, globalRemaining=${globalRemainingP.toFixed(2)}, chosenTopUp=${pToAdd.toFixed(2)}, roundedQty=${rounded.kgs.toFixed(2)}, actualP=${actualP.toFixed(2)}`);
+                    if (safeAddFertilizer(stage, fertilizerObj, stageIdx, stageTargets, deliveredBefore, `${combinationName}-topup-P`)) {
+                        globalDelivered.p += actualP;
+                        globalRemainingP   = Math.max(0, totalPRequired - globalDelivered.p);
+                        console.log(`[${combinationName}-topup] Stage ${stageIdx} P: ACCEPTED - new globalRemaining=${globalRemainingP.toFixed(2)}`);
+                    } else {
+                        console.log(`[${combinationName}-topup] Stage ${stageIdx} P: REJECTED - constraint violation`);
+                    }
+                } else {
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P: REJECTED - would exceed stage cap or global quota`);
+                }
+            }
+        }
+    }
+
+    // ── PASS 3: K top-up — most K-underfilled stage first (Tillering forbidden) ───────────
+    if (globalRemainingK > 0.1) {
+        const kOrder = [...stageIndices]
+            .filter(i => i !== 1) // Tillering: K application forbidden
+            .sort((a, b) => {
+                // Relative shortfall: naturally enforces 50/50 K split preference —
+                // if Basal and Panicle have equal targets, the one with lower fill % goes first.
+                const tA = kPerSplit[a] || 0;
+                const tB = kPerSplit[b] || 0;
+                const defA = tA > 0 ? (tA - getStageDelivered(a).k) / tA : 0;
+                const defB = tB > 0 ? (tB - getStageDelivered(b).k) / tB : 0;
+                return defB - defA;
+            });
+
+        for (const stageIdx of kOrder) {
+            if (globalRemainingK <= 0.1) break;
+
+            const stage = recommendations[stageIdx];
+            const delivered = getStageDelivered(stageIdx);
+            const deliveredK = delivered.k;
+            const stageTargetK = kPerSplit[stageIdx] || 0;
+
+            // Skip stages already at or above their target
+            if (deliveredK >= stageTargetK * 0.98) continue; // skip if within 2% of target
+
+            const kHeadroom = Math.max(0, stageTargetK * 1.12 - deliveredK);
+            if (kHeadroom <= 0.5) continue;
+
+            const stageTargets  = { n: nPerSplit[stageIdx] || 0, p: pPerSplit[stageIdx] || 0, k: stageTargetK };
+            const deliveredBefore = { n: delivered.n, p: delivered.p, k: deliveredK };
+
+            // Detect single-nutrient mode: K-only top-up when N and P are already satisfied
+            const nHeadroom = Math.max(0, (nPerSplit[stageIdx] || 0) * 1.12 - delivered.n);
+            const pHeadroom = Math.max(0, (pPerSplit[stageIdx] || 0) * 1.12 - delivered.p);
+            const isSingleNutrientKMode = kHeadroom > 0.5 && nHeadroom <= 0.5 && pHeadroom <= 0.1;
+            
+            const kFertName = selectKFertilizerForSingleNutrientTopUp(Math.min(kHeadroom, globalRemainingK), preferences, sStatus, phStatus, isSingleNutrientKMode) || 'SOP';
+            const kToAdd    = Math.min(kHeadroom, globalRemainingK, stageTargetK * 1.12 - deliveredK);
+            if (kToAdd <= 0.1) continue;
+
+            const kKgs    = convertK2OToStraight(kToAdd, kFertName.toLowerCase());
+            const rounded = roundToBag(kKgs);
+
+            if (rounded.kgs <= 0) {
+                console.log(`[${combinationName}-topup] Stage ${stageIdx} K: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
+                continue;
+            }
+
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertName);
+            if (deliveredK + actualNutrients.k <= stageTargetK * 1.12 &&
+                globalDelivered.k + actualNutrients.k <= totalKRequired) {
+                const fertilizerObj = {
+                    name: kFertName,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n || 0,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k
+                };
+                console.log(`[${combinationName}-topup] Stage ${stageIdx} K: headroom=${kHeadroom.toFixed(2)}, globalRemaining=${globalRemainingK.toFixed(2)}, chosenTopUp=${kToAdd.toFixed(2)}, roundedQty=${rounded.kgs.toFixed(2)}, actualK=${actualNutrients.k.toFixed(2)}`);
+                if (safeAddFertilizer(stage, fertilizerObj, stageIdx, stageTargets, deliveredBefore, `${combinationName}-topup-K`)) {
+                    globalDelivered.k += actualNutrients.k;
+                    globalRemainingK   = Math.max(0, totalKRequired - globalDelivered.k);
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} K: ACCEPTED - new globalRemaining=${globalRemainingK.toFixed(2)}`);
+                } else {
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} K: REJECTED - constraint violation`);
+                }
+            } else {
+                console.log(`[${combinationName}-topup] Stage ${stageIdx} K: REJECTED - would exceed stage cap or global quota`);
+            }
+        }
+    }
+
+
+    // Helper: correct bag size per fertilizer (Urea = 45 kg, all others = 50 kg)
+    const getBagSize = (name) => /urea/i.test(name) ? 45 : 50;
+
+    // Merge duplicate same-fertilizer rows and fix bag counts within each stage
+    recommendations.forEach(stage => {
+        if (!stage || !stage.fertilizers) return;
+
+        // Remove any 0 kg rows before merging (belt-and-suspenders)
+        stage.fertilizers = stage.fertilizers.filter(f => f.kgs > 0);
+
+        const merged = {};
+        const mergedList = [];
+
+        stage.fertilizers.forEach(fert => {
+            const key = fert.name.toLowerCase();
+            if (merged[key]) {
+                // Merge: accumulate quantities and nutrients
+                merged[key].kgs          += fert.kgs;
+                merged[key].nContributed  = (merged[key].nContributed || 0) + (fert.nContributed || 0);
+                merged[key].pContributed  = (merged[key].pContributed || 0) + (fert.pContributed || 0);
+                merged[key].kContributed  = (merged[key].kContributed || 0) + (fert.kContributed || 0);
+                merged[key].sContributed  = (merged[key].sContributed || 0) + (fert.sContributed || 0);
+            } else {
+                // First occurrence - clone the object
+                merged[key] = {
+                    ...fert,
+                    kgs:          fert.kgs,
+                    nContributed: fert.nContributed || 0,
+                    pContributed: fert.pContributed || 0,
+                    kContributed: fert.kContributed || 0,
+                    sContributed: fert.sContributed || 0
+                };
+            }
+        });
+
+        // Recalculate bags using correct bag size per fertilizer, then push non-zero rows
+        Object.values(merged).forEach(fert => {
+            if (fert.kgs > 0) {
+                const bs          = getBagSize(fert.name);
+                fert.bags         = fert.kgs / bs;
+                fert.fullBags     = Math.floor(fert.bags);
+                fert.remainder    = fert.kgs % bs;
+                const _bagCount    = +(fert.bags.toFixed(2));
+                fert.label        = `${+(fert.kgs.toFixed(2))} kg (${_bagCount} ${_bagCount === 1 ? 'bag' : 'bags'})`;
+                mergedList.push(fert);
+            }
+        });
+
+        stage.fertilizers = mergedList;
+    });
+}
+
+// Convert P2O5 to Gromor product - CORRECTED LOGIC
+// The location table provides MAXIMUM reference values, but actual quantities
+// should be calculated from P requirement using conversion tables (Data1)
+function convertP2O5ToGromorDirect(p2o5Required, product, p2o5Status, locationRec) {
+    // Calculate actual Gromor quantity from P requirement using conversion table
+    const table = fertilizerConversion.p2o5ToGromor[product];
+    if (!table) {
+        // Fallback: calculate from product percentage
+        const productData = fertilizerConversion.fertilizerProducts[product];
+        if (!productData || productData.p === 0) return 0;
+        return (p2o5Required / productData.p) * 100;
+    }
+    
+    // Use conversion table to get exact quantity for required P2O5
+    let calculatedDose = interpolateFromTable(table, p2o5Required, 'p2o5');
+    
+    // Check against location table maximum (if available) - this is a reference, not exact
+    if (locationRec && locationRec.gromorByPStatus && locationRec.gromorByPStatus[p2o5Status]) {
+        const productKey = product.replace(/-/g, '-');
+        const maxFromTable = locationRec.gromorByPStatus[p2o5Status][productKey];
+        
+        // If calculated exceeds maximum, use maximum (safety check)
+        if (maxFromTable && calculatedDose > maxFromTable * 1.2) {
+            // Allow 20% tolerance, but log if significantly over
+            console.warn(`Calculated dose ${calculatedDose} exceeds table max ${maxFromTable} for ${product}`);
+        }
+    }
+    
+    return calculatedDose;
+}
+
+// Calculate recommendations for Combination 1: 28-28-0 (basal) + 20-20-0 (1st top) + Urea + MOP
+function calculateCombination1(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+    const recommendations = [];
+    
+    // EXCEPTION 2: Calculate P first because complex fertilizers contain N, K, and S along with P
+    // Stage 1: Basal Application
+    const basalP = pPerSplit[0] || 0; // P at basal (70% for paddy, 100% for others)
+    const basalN = nPerSplit[0];
+    const basalK = kPerSplit[0] || 0;
+    
+    // EXCEPTION 3: If 100% P is at basal, use SSP only
+    const totalP = pPerSplit.reduce((sum, p) => sum + p, 0);
+    const is100PercentBasalP = Math.abs(basalP - totalP) < 0.01;
+    
+    const stage1 = {
+        stage: cropData.splits.n.stages[0],
+        fertilizers: []
+    };
+    
+    let remainingN = basalN;
+    let remainingK = basalK;
+    
+    if (is100PercentBasalP && checkPreference('SSP', preferences) !== 'Reject') {
+        // EXCEPTION 3: 100% P basal = SSP only
+        const sspKgs = (basalP / 16) * 100; // SSP is 16% P2O5
+        const rounded = roundToBag(sspKgs);
+        const actualNutrients = getNutrientsFromStraight(rounded.kgs, 'SSP');
+        stage1.fertilizers.push({
+            name: 'SSP',
+            kgs: rounded.kgs,
+            ...rounded,
+            nContributed: 0,
+            pContributed: actualNutrients.p,
+            kContributed: 0
+        });
+    } else {
+        // EXCEPTION 6 & 9: Use high P fertilizer at basal, or auto-select SSP/high P
+        // Apply 28-28-0 for basal (high P fertilizer)
+        const gromor28280 = convertP2O5ToGromor(basalP, '28-28-0');
+        const rounded28280 = roundToBag(gromor28280);
+        // CRITICAL FIX: Calculate nutrients from ROUNDED quantity, not unrounded
+        const actualNutrients28280 = getNutrientsFromGromor(rounded28280.kgs, '28-28-0');
+        remainingN = Math.max(0, basalN - actualNutrients28280.n);
+        
+        if (checkPreference('28-28-0', preferences) !== 'Reject' && gromor28280 > 0) {
+            const fertilizerObj = {
+                name: 'Gromor 28-28-0',
+                kgs: rounded28280.kgs,
+                ...rounded28280,
+                nContributed: actualNutrients28280.n,
+                pContributed: (rounded28280.kgs * 28) / 100, // Actual P from rounded quantity
+                kContributed: 0
+            };
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: 0, p: 0, k: 0 };
+            safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination1-basal-28-28-0');
+        }
+    }
+    
+    // Select N fertilizer based on S and pH status - USE safeAddFertilizer
+    if (remainingN > 0) {
+        const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+        if (nFertilizer) {
+            const nKgs = convertNToStraight(remainingN, nFertilizer.toLowerCase());
+            // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+            const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: nFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k || 0
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            if (safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination1-basal-N')) {
+                remainingN = Math.max(0, basalN - (stage1DeliveredN + actualNutrients.n));
+            }
+        }
+    }
+    
+    // Select K fertilizer based on S and pH status - USE safeAddFertilizer
+    if (basalK > 0) {
+        const kFertilizer = selectKFertilizer(basalK, preferences, sStatus, phStatus);
+        if (kFertilizer) {
+            const kKgs = convertK2OToStraight(basalK, kFertilizer.toLowerCase());
+            const rounded = roundToBagUp(kKgs, 50);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: kFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n || 0,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination1-basal-K');
+        }
+    }
+    
+    // Calculate actual N, P, K delivered in Stage 1
+    let cumulativeN = 0, cumulativeP = 0, cumulativeK = 0;
+    stage1.fertilizers.forEach(fert => {
+        cumulativeN += fert.nContributed || 0;
+        cumulativeP += fert.pContributed || 0;
+        cumulativeK += fert.kContributed || 0;
+    });
+    
+    // Calculate total N, P, K required and remaining
+    const totalNRequired = nPerSplit.reduce((sum, n) => sum + n, 0);
+    const totalPRequired = pPerSplit.reduce((sum, p) => sum + p, 0);
+    const totalKRequired = kPerSplit.reduce((sum, k) => sum + k, 0);
+    const remainingNTotal = Math.max(0, totalNRequired - cumulativeN);
+    const remainingPTotal = Math.max(0, totalPRequired - cumulativeP);
+    const remainingKTotal = Math.max(0, totalKRequired - cumulativeK);
+    const remainingStages = nPerSplit.length - 1;
+    
+    recommendations.push(stage1);
+    
+    // Stage 2: First Top Dressing - USE ORIGINAL STAGE TARGETS (not adjusted/remaining)
+    if (nPerSplit.length > 1) {
+        // CRITICAL FIX: Use ORIGINAL stage targets, NOT adjusted/remaining values
+        // Stage targets are PRIMARY - we must solve each stage against its original quota
+        // Rebalancing should only happen if a stage is infeasible, not by default
+        const originalStage2N = nPerSplit[1] || 0;
+        const originalStage2P = pPerSplit[1] || 0;
+        const originalStage2K = kPerSplit[1] || 0;
+        
+        // Calculate what's already delivered in Stage 1
+        let stage1DeliveredN = 0;
+        let stage1DeliveredP = 0;
+        let stage1DeliveredK = 0;
+        stage1.fertilizers.forEach(fert => {
+            stage1DeliveredN += fert.nContributed || 0;
+            stage1DeliveredP += fert.pContributed || 0;
+            stage1DeliveredK += fert.kContributed || 0;
+        });
+        
+        // Stage 2 targets are the ORIGINAL split targets, not adjusted
+        // If Stage 1 under-delivered, that's a separate issue to handle later
+        const topN = originalStage2N;
+        const topK = originalStage2K;
+        const stage2P = originalStage2P;
+        
+        const stage2 = {
+            stage: cropData.splits.n.stages[1],
+            fertilizers: []
+        };
+        
+        let remainingN = topN;
+        let remainingK = topK;
+        
+        // OPTIMIZED: STEP 1 - FIRST fulfill P requirement (if any)
+        // EXCEPTION 2: P calculated first because P fertilizers contain N, K, and S
+        // EXCEPTION 4 & 6: Use low P fertilizers (20-20-0-13, 16-20-0-13, 28-28-0) at stage 2
+        // SSP should NOT be used at stage 2 (powder form, difficult to apply at 30 days)
+        if (stage2P > 0) {
+            const pFertilizer = selectP2O5Fertilizer(stage2P, 'at Tillering', preferences, pStatus, locationRec);
+            
+            // CRITICAL: Check if pFertilizer is not null before accessing its properties
+            if (pFertilizer && pFertilizer.method === 'gromor') {
+                const gromorKgs = convertP2O5ToGromorDirect(stage2P, pFertilizer.product, pStatus, locationRec);
+                const nutrients = getNutrientsFromGromor(gromorKgs, pFertilizer.product);
+                const rounded = roundToBag(gromorKgs);
+                
+                // Calculate actual nutrients from rounded quantity
+                const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                
+                // CRITICAL: Validate complex P fertilizer doesn't contain K when adding to Tillering
+                const fertilizerObj = {
+                    name: `Gromor ${pFertilizer.product}`,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p, // CRITICAL: Use actual P from rounded quantity, not required
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                const stageTargets = { n: topN, p: stage2P, k: topK };
+                const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                
+                if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination1-stage2-P')) {
+                    // Adjust remaining N and K after P fertilizer
+                    remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    remainingK = Math.max(0, topK - (stage2DeliveredK + actualNutrients.k));
+                } else {
+                    console.error(`[Combination1] Failed to add P fertilizer to Tillering - constraint violation!`);
+                    // Don't adjust remaining if rejected
+                }
+            } else if (!pFertilizer || (pFertilizer.method === 'gromor' && checkPreference(pFertilizer.product, preferences) === 'Reject')) {
+                // Fallback: If no Gromor product available or all rejected, use SSP (mandatory to meet P requirement)
+                // Even though SSP is not ideal at Stage 2, meeting P requirement is critical
+                if (checkPreference('SSP', preferences) !== 'Reject') {
+                    const sspKgs = (stage2P / 16) * 100; // SSP has 16% P
+                    const rounded = roundToBagUp(sspKgs, 50); // Round UP to ensure minimum
+                    const actualP = (rounded.kgs * 16) / 100;
+                    const actualS = (rounded.kgs * 12) / 100;
+                    const fertilizerObj = {
+                        name: 'SSP',
+                        kgs: rounded.kgs,
+                        bags: rounded.kgs / 50,
+                        fullBags: Math.floor(rounded.kgs / 50),
+                        remainder: rounded.kgs % 50,
+                        nContributed: 0,
+                        pContributed: actualP,
+                        kContributed: 0,
+                        sContributed: actualS
+                    };
+                    
+                    // Calculate delivered nutrients so far in stage2
+                    let stage2DeliveredN = 0;
+                    let stage2DeliveredP = 0;
+                    let stage2DeliveredK = 0;
+                    stage2.fertilizers.forEach(fert => {
+                        stage2DeliveredN += fert.nContributed || 0;
+                        stage2DeliveredP += fert.pContributed || 0;
+                        stage2DeliveredK += fert.kContributed || 0;
+                    });
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination1-stage2-P-fallback')) {
+                        // SSP doesn't contribute N or K, so remainingN and remainingK stay the same
+                    }
+                }
+            }
+        }
+        
+        // STEP 2: THEN fulfill remaining N requirement with Urea (or other N fertilizer)
+        if (remainingN > 0) {
+            const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                // CRITICAL: Cap N addition to respect stage limit
+                const maxAllowedN = topN - stage2DeliveredN;
+                const nToAdd = Math.min(remainingN, maxAllowedN > 0 ? maxAllowedN : 0);
+                
+                if (nToAdd > 0) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination1-stage2-N')) {
+                        remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    }
+                }
+            }
+        }
+        
+        // STEP 3: Add K fertilizer if needed - BUT K NOT ALLOWED IN TILLERING (stageIndex === 1)
+        // CRITICAL: K must be 0 in Tillering stage - skip K addition
+        // Only add K if remainingK is significant (> 0.5 kg) to avoid excessive rounding
+        if (remainingK > 0.5) {
+            // CRITICAL FIX: Stage 2 is Tillering (index 1) - K not allowed
+            const stage2Index = 1; // Tillering stage
+            if (stage2Index === 1) {
+                console.warn(`[Combination1] Stage 2 (Tillering): K remaining=${remainingK.toFixed(2)} but K not allowed in Tillering - skipping K addition`);
+                // Do not add K fertilizer in Tillering stage
+            } else {
+                const kFertilizer = selectKFertilizer(remainingK, preferences, sStatus, phStatus);
+                if (kFertilizer) {
+                    const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+                    // Use roundToBag (rounds to nearest) instead of roundToBagUp to minimize excess
+                    const rounded = roundToBag(kKgs);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: kFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n || 0,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k
+                    };
+                    
+                    // Calculate delivered nutrients so far in stage2
+                    let stage2DeliveredN = 0;
+                    let stage2DeliveredP = 0;
+                    let stage2DeliveredK = 0;
+                    stage2.fertilizers.forEach(fert => {
+                        stage2DeliveredN += fert.nContributed || 0;
+                        stage2DeliveredP += fert.pContributed || 0;
+                        stage2DeliveredK += fert.kContributed || 0;
+                    });
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    // Use safeAddFertilizer to enforce constraints
+                    safeAddFertilizer(stage2, fertilizerObj, stage2Index, stageTargets, deliveredBefore, 'combination1-stage2-K');
+                }
+            }
+        }
+        
+        // Update cumulative N, P, K after Stage 2
+        stage2.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        recommendations.push(stage2);
+    }
+    
+    // Stage 3+: Additional top dressings - USE ORIGINAL STAGE TARGETS (no rebalancing)
+    for (let i = 2; i < nPerSplit.length; i++) {
+        // STRICT: Use original stage targets (no rebalancing to compensate for earlier deficits)
+        const stageN = nPerSplit[i] || 0; // Original N target (1/3 rule)
+        const stageP = pPerSplit[i] || 0; // Original P split (0 for Panicle)
+        const stageK = kPerSplit[i] || 0; // Original K split (50% for Panicle)
+        
+        if (stageN <= 0 && stageK <= 0 && stageP <= 0) continue;
+        
+        const stage = {
+            stage: cropData.splits.n.stages[i] || `Stage ${i + 1}`,
+            fertilizers: []
+        };
+        
+        let deliveredN = 0;
+        let deliveredP = 0;
+        let deliveredK = 0;
+        
+        const stageTargets = { n: stageN, p: stageP, k: stageK };
+        
+        // Select N fertilizer based on S and pH status
+        if (stageN > 0) {
+            const nFertilizer = selectNFertilizer(stageN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                const nKgs = convertNToStraight(stageN, nFertilizer.toLowerCase());
+                const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                
+                const fertilizerObj = {
+                    name: nFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'rebalancing-N')) {
+                    deliveredN += actualNutrients.n;
+                }
+            }
+        }
+        
+        // Select K fertilizer based on S and pH status
+        // CRITICAL: Check if stage is Tillering (i === 1) - K not allowed
+        if (stageK > 0 && i !== 1) {
+            const kFertilizer = selectKFertilizer(stageK, preferences, sStatus, phStatus);
+            if (kFertilizer) {
+                const kKgs = convertK2OToStraight(stageK, kFertilizer.toLowerCase());
+                const rounded = roundToBagUp(kKgs, 50);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                
+                const fertilizerObj = {
+                    name: kFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n || 0,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k
+                };
+                
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'rebalancing-K')) {
+                    deliveredK += actualNutrients.k;
+                }
+            }
+        }
+        
+        // Update cumulative N, P, K after each stage
+        stage.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        if (stage.fertilizers.length > 0) {
+            recommendations.push(stage);
+        }
+    }
+    
+    // FINAL REBALANCING: If total N, P, K are still below minimum, add to appropriate stage
+    // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+    const minRequiredN = totalNRequired * 0.88; // 12% tolerance
+    const minRequiredP = totalPRequired * 0.88;
+    const minRequiredK = totalKRequired * 0.88;
+    
+    if (recommendations.length > 0) {
+        // For Paddy: P should be at Stage 2 (tillering), not Stage 3
+        // Find Stage 2 (index 1) if it exists, otherwise use last stage
+        const stage2Index = recommendations.findIndex(s => s.stage && s.stage.toLowerCase().includes('tillering'));
+        const pStage = stage2Index >= 0 ? recommendations[stage2Index] : recommendations[recommendations.length - 1];
+        const lastStage = recommendations[recommendations.length - 1];
+        
+        // Add N deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeN < minRequiredN) {
+            const deficit = totalNRequired - cumulativeN; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // Calculate already delivered nutrients in lastStage
+            let lastStageDeliveredN = 0;
+            let lastStageDeliveredP = 0;
+            let lastStageDeliveredK = 0;
+            lastStage.fertilizers.forEach(fert => {
+                lastStageDeliveredN += fert.nContributed || 0;
+                lastStageDeliveredP += fert.pContributed || 0;
+                lastStageDeliveredK += fert.kContributed || 0;
+            });
+            
+            // Check if we can add N without exceeding stage limit
+            const maxAllowedN = originalStageN - lastStageDeliveredN;
+            const nToAdd = Math.min(deficit, maxAllowedN > 0 ? maxAllowedN : 0);
+            
+            if (nToAdd > 0) {
+                // Try to get N fertilizer, but if preferences reject all, use Urea anyway (mandatory)
+                let nFertilizer = selectNFertilizer(nToAdd, preferences, sStatus, phStatus);
+                if (!nFertilizer) {
+                    // Fallback: Use Urea if all others are rejected (mandatory to meet minimum)
+                    nFertilizer = 'Urea';
+                }
+                if (nFertilizer) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL: Always round UP to ensure we meet minimum (never round down)
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                    const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                    
+                    if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-N')) {
+                        cumulativeN += actualNutrients.n;
+                    } else {
+                        console.warn(`[Combination1 Final Rebalancing] Cannot add N to lastStage (${lastStage.stage}) - would violate stage constraints`);
+                    }
+                }
+            } else {
+                console.warn(`[Combination1 Final Rebalancing] Cannot add N deficit (${deficit.toFixed(2)} kg) to lastStage - would exceed stage N limit (${originalStageN.toFixed(2)} kg)`);
+            }
+        }
+        
+        // Add P deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+        if (cumulativeP < minRequiredP) {
+            const deficit = totalPRequired - cumulativeP; // Use full requirement, not just 88%
+            
+            // Determine which stage is pStage (should be Stage 2/Tillering for Paddy)
+            const pStageIndex = stage2Index >= 0 ? 1 : recommendations.length - 1;
+            const originalStageN = nPerSplit[pStageIndex] || 0;
+            const originalStageP = pPerSplit[pStageIndex] || 0;
+            const originalStageK = kPerSplit[pStageIndex] || 0;
+            
+            // CRITICAL: P not allowed in Panicle (stageIndex === 2)
+            if (pStageIndex === 2) {
+                console.warn(`[Combination1 Final Rebalancing] Cannot add P to pStage (${pStage.stage}) - P not allowed in Panicle stage`);
+            } else {
+                // Calculate already delivered nutrients in pStage
+                let pStageDeliveredN = 0;
+                let pStageDeliveredP = 0;
+                let pStageDeliveredK = 0;
+                pStage.fertilizers.forEach(fert => {
+                    pStageDeliveredN += fert.nContributed || 0;
+                    pStageDeliveredP += fert.pContributed || 0;
+                    pStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add P without exceeding stage limit
+                const maxAllowedP = originalStageP - pStageDeliveredP;
+                const pToAdd = Math.min(deficit, maxAllowedP > 0 ? maxAllowedP : 0);
+                
+                if (pToAdd > 0) {
+                    // Try to add P through appropriate fertilizer
+                    let pFertilizer = selectP2O5Fertilizer(pToAdd, 'Final', preferences, pStatus, locationRec);
+                    // If no Gromor product available or rejected, use SSP as fallback (MANDATORY to meet minimum)
+                    if (!pFertilizer || (pFertilizer.method === 'gromor' && checkPreference(pFertilizer.product, preferences) === 'Reject')) {
+                        // MANDATORY: Use SSP even if rejected - meeting minimum is required
+                        pFertilizer = { product: 'SSP', method: 'straight' };
+                    }
+                    
+                    // Always add P fertilizer (mandatory to meet minimum)
+                    // CRITICAL: Add to Stage 2 (tillering) for Paddy, not Stage 3
+                    if (pFertilizer) {
+                        if (pFertilizer && pFertilizer.method === 'gromor') {
+                            const gromorKgs = convertP2O5ToGromorDirect(pToAdd, pFertilizer.product, pStatus, locationRec);
+                            const rounded = roundToBagUp(gromorKgs, 50); // Round UP to ensure minimum
+                            const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                            
+                            const fertilizerObj = {
+                                name: `Gromor ${pFertilizer.product}`,
+                                kgs: rounded.kgs,
+                                ...rounded,
+                                nContributed: actualNutrients.n,
+                                pContributed: actualNutrients.p,
+                                kContributed: actualNutrients.k || 0
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P')) {
+                                cumulativeP += actualNutrients.p;
+                            }
+                        } else if (pFertilizer.method === 'straight' && pFertilizer.product === 'SSP') {
+                            // SSP: 16% P, 12% S
+                            const sspKgs = (pToAdd / 16) * 100;
+                            const rounded = roundToBagUp(sspKgs, 50); // Round UP to ensure minimum
+                            const actualP = (rounded.kgs * 16) / 100;
+                            const actualS = (rounded.kgs * 12) / 100;
+                            
+                            const fertilizerObj = {
+                                name: 'SSP',
+                                kgs: rounded.kgs,
+                                bags: rounded.kgs / 45,
+                                fullBags: Math.floor(rounded.kgs / 45),
+                                remainder: rounded.kgs % 45,
+                                nContributed: 0,
+                                pContributed: actualP,
+                                kContributed: 0,
+                                sContributed: actualS
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P-SSP')) {
+                                cumulativeP += actualP;
+                            }
+                        }
+                    }
+                } else {
+                    console.warn(`[Combination1 Final Rebalancing] Cannot add P deficit (${deficit.toFixed(2)} kg) to pStage - would exceed stage P limit (${originalStageP.toFixed(2)} kg)`);
+                }
+            }
+        }
+        
+        // Add K deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeK < minRequiredK) {
+            const deficit = totalKRequired - cumulativeK; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // CRITICAL: K not allowed in Tillering (stageIndex === 1)
+            if (lastStageIndex === 1) {
+                console.warn(`[Combination1 Final Rebalancing] Cannot add K to lastStage (${lastStage.stage}) - K not allowed in Tillering stage`);
+            } else {
+                // Calculate already delivered nutrients in lastStage
+                let lastStageDeliveredN = 0;
+                let lastStageDeliveredP = 0;
+                let lastStageDeliveredK = 0;
+                lastStage.fertilizers.forEach(fert => {
+                    lastStageDeliveredN += fert.nContributed || 0;
+                    lastStageDeliveredP += fert.pContributed || 0;
+                    lastStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add K without exceeding stage limit
+                const maxAllowedK = originalStageK - lastStageDeliveredK;
+                const kToAdd = Math.min(deficit, maxAllowedK > 0 ? maxAllowedK : 0);
+                
+                if (kToAdd > 0) {
+                    let kFertilizer = selectKFertilizer(kToAdd, preferences, sStatus, phStatus);
+                    // Fallback: Use MOP if all others are rejected (mandatory to meet minimum)
+                    if (!kFertilizer) {
+                        kFertilizer = 'MOP';
+                    }
+                    if (kFertilizer) {
+                        const kKgs = convertK2OToStraight(kToAdd, kFertilizer.toLowerCase());
+                        const rounded = roundToBagUp(kKgs, 50);
+                        const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                        
+                        const fertilizerObj = {
+                            name: kFertilizer,
+                            kgs: rounded.kgs,
+                            ...rounded,
+                            nContributed: actualNutrients.n || 0,
+                            pContributed: actualNutrients.p || 0,
+                            kContributed: actualNutrients.k
+                        };
+                        
+                        const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                        const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                        
+                        if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-K')) {
+                            cumulativeK += actualNutrients.k;
+                        } else {
+                            console.warn(`[Combination1 Final Rebalancing] Cannot add K to lastStage (${lastStage.stage}) - would violate stage constraints`);
+                        }
+                    }
+                } else {
+                    console.warn(`[Combination1 Final Rebalancing] Cannot add K deficit (${deficit.toFixed(2)} kg) to lastStage - would exceed stage K limit (${originalStageK.toFixed(2)} kg)`);
+                }
+            }
+        }
+    }
+    
+    // STAGE-SAFE TOP-UP PASS: Fill remaining headroom in each stage
+    applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, 'combination1');
+    
+    return recommendations;
+}
+
+// Calculate recommendations for Combination 2: 14-35-14 + 20-20-0
+function calculateCombination2(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+    const recommendations = [];
+    
+    // Stage 1: Basal with 14-35-14
+    const basalP = pPerSplit[0] || 0; // P at basal (60% for paddy, 100% for others)
+    const basalN = nPerSplit[0];
+    const basalK = kPerSplit[0] || 0;
+    
+    const gromor143514 = convertP2O5ToGromor(basalP, '14-35-14');
+    const rounded143514 = roundToBag(gromor143514);
+    // CRITICAL FIX: Calculate nutrients from ROUNDED quantity, not unrounded
+    const actualNutrients143514 = getNutrientsFromGromor(rounded143514.kgs, '14-35-14');
+    let remainingN = Math.max(0, basalN - actualNutrients143514.n);
+    let remainingK = Math.max(0, basalK - actualNutrients143514.k);
+    
+    const stage1 = {
+        stage: cropData.splits.n.stages[0],
+        fertilizers: []
+    };
+    
+    if (checkPreference('14-35-14', preferences) !== 'Reject' && gromor143514 > 0) {
+        const fertilizerObj = {
+            name: 'Gromor 14-35-14',
+            kgs: rounded143514.kgs,
+            ...rounded143514,
+            nContributed: actualNutrients143514.n,
+            pContributed: (rounded143514.kgs * 35) / 100, // Actual P from rounded quantity
+            kContributed: actualNutrients143514.k
+        };
+        const stageTargets = { n: basalN, p: basalP, k: basalK };
+        const deliveredBefore = { n: 0, p: 0, k: 0 };
+        safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination2-basal-14-35-14');
+    }
+    
+    // Select N fertilizer based on S and pH status - USE safeAddFertilizer
+    if (remainingN > 0) {
+        const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+        if (nFertilizer) {
+            const nKgs = convertNToStraight(remainingN, nFertilizer.toLowerCase());
+            // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+            const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: nFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k || 0
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            if (safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination2-basal-N')) {
+                remainingN = Math.max(0, basalN - (stage1DeliveredN + actualNutrients.n));
+            }
+        }
+    }
+    
+    // Select K fertilizer based on S and pH status - USE safeAddFertilizer
+    if (remainingK > 0) {
+        const kFertilizer = selectKFertilizer(remainingK, preferences, sStatus, phStatus);
+        if (kFertilizer) {
+            const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+            const rounded = roundToBagUp(kKgs, 50);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: kFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n || 0,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination2-basal-K');
+        }
+    }
+    
+    // Calculate actual N, P, K delivered in Stage 1
+    let cumulativeN = 0, cumulativeP = 0, cumulativeK = 0;
+    stage1.fertilizers.forEach(fert => {
+        cumulativeN += fert.nContributed || 0;
+        cumulativeP += fert.pContributed || 0;
+        cumulativeK += fert.kContributed || 0;
+    });
+    
+    // Calculate total N, P, K required and remaining
+    const totalNRequired = nPerSplit.reduce((sum, n) => sum + n, 0);
+    const totalPRequired = pPerSplit.reduce((sum, p) => sum + p, 0);
+    const totalKRequired = kPerSplit.reduce((sum, k) => sum + k, 0);
+    const remainingNTotal = Math.max(0, totalNRequired - cumulativeN);
+    const remainingPTotal = Math.max(0, totalPRequired - cumulativeP);
+    const remainingKTotal = Math.max(0, totalKRequired - cumulativeK);
+    const remainingStages = nPerSplit.length - 1;
+    
+    recommendations.push(stage1);
+    
+    // Stage 2: First Top - USE ORIGINAL STAGE TARGETS (not adjusted/remaining)
+    // EXCEPTION 2: P calculated first because P fertilizers contain N, K, and S
+    if (nPerSplit.length > 1) {
+        // CRITICAL FIX: Use ORIGINAL stage targets, NOT adjusted/remaining values
+        // Stage targets are PRIMARY - we must solve each stage against its original quota
+        const originalStage2N = nPerSplit[1] || 0;
+        const originalStage2P = pPerSplit[1] || 0;
+        const originalStage2K = kPerSplit[1] || 0;
+        
+        const topN = originalStage2N;
+        const topK = originalStage2K;
+        const stage2P = originalStage2P;
+        
+        const stage2 = {
+            stage: cropData.splits.n.stages[1],
+            fertilizers: []
+        };
+        
+        let remainingN = topN;
+        let remainingK = topK;
+        
+        // STEP 1: FIRST fulfill P requirement (if any)
+        // EXCEPTION 4 & 6: Use low P fertilizers (20-20-0-13, 16-20-0-13, 28-28-0) at stage 2
+        // SSP should NOT be used at stage 2 (powder form, difficult to apply at 30 days)
+        if (stage2P > 0) {
+            const pFertilizer = selectP2O5Fertilizer(stage2P, 'at Tillering', preferences, pStatus, locationRec);
+            
+            if (pFertilizer && pFertilizer.method === 'gromor') {
+                const gromorKgs = convertP2O5ToGromorDirect(stage2P, pFertilizer.product, pStatus, locationRec);
+                const nutrients = getNutrientsFromGromor(gromorKgs, pFertilizer.product);
+                const rounded = roundToBag(gromorKgs);
+                
+                // Calculate actual nutrients from rounded quantity
+                const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                const fertilizerObj = {
+                    name: `Gromor ${pFertilizer.product}`,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p, // CRITICAL: Use actual P from rounded quantity, not required
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: topN, p: stage2P, k: topK };
+                const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                
+                if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination2-stage2-P')) {
+                    // Adjust remaining N and K after P fertilizer
+                    remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    remainingK = Math.max(0, topK - (stage2DeliveredK + actualNutrients.k));
+                } else {
+                    console.error(`[Combination2] Failed to add P fertilizer to Tillering - constraint violation!`);
+                }
+            }
+        }
+        
+        // STEP 2: THEN fulfill remaining N requirement with Urea (or other N fertilizer)
+        if (remainingN > 0) {
+            const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                // CRITICAL: Cap N addition to respect stage limit
+                const maxAllowedN = topN - stage2DeliveredN;
+                const nToAdd = Math.min(remainingN, maxAllowedN > 0 ? maxAllowedN : 0);
+                
+                if (nToAdd > 0) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination3-stage2-N')) {
+                        remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    }
+                }
+            }
+        }
+        
+        // STEP 3: Add K fertilizer if needed - BUT K NOT ALLOWED IN TILLERING (stageIndex === 1)
+        // CRITICAL: K must be 0 in Tillering stage - skip K addition
+        // Only add K if remainingK is significant (> 0.5 kg) to avoid excessive rounding
+        if (remainingK > 0.5) {
+            // CRITICAL FIX: Stage 2 is Tillering (index 1) - K not allowed
+            const stage2Index = 1; // Tillering stage
+            if (stage2Index === 1) {
+                const comboName = 'Combination';
+                console.warn(`[${comboName}] Stage 2 (Tillering): K remaining=${remainingK.toFixed(2)} but K not allowed in Tillering - skipping K addition`);
+                // Do not add K fertilizer in Tillering stage
+            } else {
+                const kFertilizer = selectKFertilizer(remainingK, preferences, sStatus, phStatus);
+                if (kFertilizer) {
+                    const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+                    // Use roundToBag (rounds to nearest) instead of roundToBagUp to minimize excess
+                    const rounded = roundToBag(kKgs);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: kFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n || 0,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k
+                    };
+                    
+                    // Calculate delivered nutrients so far in stage2
+                    let stage2DeliveredN = 0;
+                    let stage2DeliveredP = 0;
+                    let stage2DeliveredK = 0;
+                    stage2.fertilizers.forEach(fert => {
+                        stage2DeliveredN += fert.nContributed || 0;
+                        stage2DeliveredP += fert.pContributed || 0;
+                        stage2DeliveredK += fert.kContributed || 0;
+                    });
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    // Use safeAddFertilizer to enforce constraints
+                    const comboName = 'combination';
+                    safeAddFertilizer(stage2, fertilizerObj, stage2Index, stageTargets, deliveredBefore, `${comboName}-stage2-K`);
+                }
+            }
+        }
+        
+        // Update cumulative N, P, K after Stage 2
+        stage2.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        // CRITICAL: Validate Stage 2 against original targets
+        let stage2FinalN = 0;
+        let stage2FinalP = 0;
+        let stage2FinalK = 0;
+        stage2.fertilizers.forEach(fert => {
+            stage2FinalN += fert.nContributed || 0;
+            stage2FinalP += fert.pContributed || 0;
+            stage2FinalK += fert.kContributed || 0;
+        });
+        
+        const stage2NCap = topN * 1.12; // 12% tolerance
+        const stage2PCap = stage2P * 1.12;
+        const stage2KCap = topK * 1.12;
+        
+        if (stage2FinalN > stage2NCap) {
+            console.error(`[Combination2] Stage 2 (Tillering) N OVERFLOW: ${stage2FinalN.toFixed(2)} > ${stage2NCap.toFixed(2)} (target: ${topN.toFixed(2)})`);
+        }
+        if (stage2FinalP > stage2PCap) {
+            console.error(`[Combination2] Stage 2 (Tillering) P OVERFLOW: ${stage2FinalP.toFixed(2)} > ${stage2PCap.toFixed(2)} (target: ${stage2P.toFixed(2)})`);
+        }
+        if (stage2FinalK > 0.01) {
+            console.error(`[Combination2] Stage 2 (Tillering) K VIOLATION: ${stage2FinalK.toFixed(2)} > 0 (K not allowed in Tillering)`);
+        }
+        
+        recommendations.push(stage2);
+    }
+    
+    // Additional stages - USE ORIGINAL STAGE TARGETS (no rebalancing)
+    for (let i = 2; i < nPerSplit.length; i++) {
+        // STRICT: Use original stage targets (no rebalancing to compensate for earlier deficits)
+        const stageN = nPerSplit[i] || 0; // Original N target (1/3 rule)
+        const stageP = pPerSplit[i] || 0; // Original P split (0 for Panicle)
+        const stageK = kPerSplit[i] || 0; // Original K split (50% for Panicle)
+        
+        if (stageN <= 0 && stageK <= 0 && stageP <= 0) continue;
+        
+        const stage = {
+            stage: cropData.splits.n.stages[i] || `Stage ${i + 1}`,
+            fertilizers: []
+        };
+        
+        let deliveredN = 0;
+        let deliveredP = 0;
+        let deliveredK = 0;
+        
+        // Select N fertilizer based on S and pH status - USE safeAddFertilizer
+        if (stageN > 0) {
+            const nFertilizer = selectNFertilizer(stageN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                const nKgs = convertNToStraight(stageN, nFertilizer.toLowerCase());
+                // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                
+                const fertilizerObj = {
+                    name: nFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: stageN, p: stageP, k: stageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination2-stage3+-N')) {
+                    deliveredN += actualNutrients.n;
+                }
+            }
+        }
+        
+        // Select K fertilizer based on S and pH status - USE safeAddFertilizer
+        if (stageK > 0) {
+            const kFertilizer = selectKFertilizer(stageK, preferences, sStatus, phStatus);
+            if (kFertilizer) {
+                const kKgs = convertK2OToStraight(stageK, kFertilizer.toLowerCase());
+                const rounded = roundToBagUp(kKgs, 50);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                
+                const fertilizerObj = {
+                    name: kFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n || 0,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k
+                };
+                
+                const stageTargets = { n: stageN, p: stageP, k: stageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination2-stage3+-K')) {
+                    deliveredK += actualNutrients.k;
+                }
+            }
+        }
+        
+        // Update cumulative N, P, K after each stage
+        stage.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        if (stage.fertilizers.length > 0) {
+            recommendations.push(stage);
+        }
+    }
+    
+    // FINAL REBALANCING: If total N, P, K are still below minimum, add to appropriate stage
+    // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+    const minRequiredN = totalNRequired * 0.88; // 12% tolerance
+    const minRequiredP = totalPRequired * 0.88;
+    const minRequiredK = totalKRequired * 0.88;
+    
+    if (recommendations.length > 0) {
+        // For Paddy: P should be at Stage 2 (tillering), not Stage 3
+        // Find Stage 2 (index 1) if it exists, otherwise use last stage
+        const stage2Index = recommendations.findIndex(s => s.stage && s.stage.toLowerCase().includes('tillering'));
+        const pStage = stage2Index >= 0 ? recommendations[stage2Index] : recommendations[recommendations.length - 1];
+        const lastStage = recommendations[recommendations.length - 1];
+        
+        // Add N deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeN < minRequiredN) {
+            const deficit = totalNRequired - cumulativeN; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // Calculate already delivered nutrients in lastStage
+            let lastStageDeliveredN = 0;
+            let lastStageDeliveredP = 0;
+            let lastStageDeliveredK = 0;
+            lastStage.fertilizers.forEach(fert => {
+                lastStageDeliveredN += fert.nContributed || 0;
+                lastStageDeliveredP += fert.pContributed || 0;
+                lastStageDeliveredK += fert.kContributed || 0;
+            });
+            
+            // Check if we can add N without exceeding stage limit
+            const maxAllowedN = originalStageN - lastStageDeliveredN;
+            const nToAdd = Math.min(deficit, maxAllowedN > 0 ? maxAllowedN : 0);
+            
+            if (nToAdd > 0) {
+                // Try to get N fertilizer, but if preferences reject all, use Urea anyway (mandatory)
+                let nFertilizer = selectNFertilizer(nToAdd, preferences, sStatus, phStatus);
+                if (!nFertilizer) {
+                    // Fallback: Use Urea if all others are rejected (mandatory to meet minimum)
+                    nFertilizer = 'Urea';
+                }
+                if (nFertilizer) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL: Always round UP to ensure we meet minimum (never round down)
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                    const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                    
+                    if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-N')) {
+                        cumulativeN += actualNutrients.n;
+                    }
+                }
+            }
+        }
+        
+        // Add P deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+        if (cumulativeP < minRequiredP) {
+            const deficit = totalPRequired - cumulativeP; // Use full requirement, not just 88%
+            
+            // Determine which stage is pStage (should be Stage 2/Tillering for Paddy)
+            const pStageIndex = stage2Index >= 0 ? 1 : recommendations.length - 1;
+            const originalStageN = nPerSplit[pStageIndex] || 0;
+            const originalStageP = pPerSplit[pStageIndex] || 0;
+            const originalStageK = kPerSplit[pStageIndex] || 0;
+            
+            // CRITICAL: P not allowed in Panicle (stageIndex === 2)
+            if (pStageIndex === 2) {
+                console.warn(`[Combination2 Final Rebalancing] Cannot add P to pStage (${pStage.stage}) - P not allowed in Panicle stage`);
+            } else {
+                // Calculate already delivered nutrients in pStage
+                let pStageDeliveredN = 0;
+                let pStageDeliveredP = 0;
+                let pStageDeliveredK = 0;
+                pStage.fertilizers.forEach(fert => {
+                    pStageDeliveredN += fert.nContributed || 0;
+                    pStageDeliveredP += fert.pContributed || 0;
+                    pStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add P without exceeding stage limit
+                const maxAllowedP = originalStageP - pStageDeliveredP;
+                const pToAdd = Math.min(deficit, maxAllowedP > 0 ? maxAllowedP : 0);
+                
+                if (pToAdd > 0) {
+                    // Try to add P through appropriate fertilizer
+                    let pFertilizer = selectP2O5Fertilizer(pToAdd, 'Final', preferences, pStatus, locationRec);
+                    // If no Gromor product available or rejected, use SSP as fallback (MANDATORY to meet minimum)
+                    if (!pFertilizer || (pFertilizer.method === 'gromor' && checkPreference(pFertilizer.product, preferences) === 'Reject')) {
+                        // MANDATORY: Use SSP even if rejected - meeting minimum is required
+                        pFertilizer = { product: 'SSP', method: 'straight' };
+                    }
+                    
+                    // Always add P fertilizer (mandatory to meet minimum)
+                    // CRITICAL: Add to Stage 2 (tillering) for Paddy, not Stage 3
+                    if (pFertilizer) {
+                        if (pFertilizer && pFertilizer.method === 'gromor') {
+                            const gromorKgs = convertP2O5ToGromorDirect(pToAdd, pFertilizer.product, pStatus, locationRec);
+                            const rounded = roundToBagUp(gromorKgs, 50); // Round UP to ensure minimum
+                            const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                            
+                            const fertilizerObj = {
+                                name: `Gromor ${pFertilizer.product}`,
+                                kgs: rounded.kgs,
+                                ...rounded,
+                                nContributed: actualNutrients.n,
+                                pContributed: actualNutrients.p,
+                                kContributed: actualNutrients.k || 0
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P')) {
+                                cumulativeP += actualNutrients.p;
+                            }
+                        } else if (pFertilizer.method === 'straight' && pFertilizer.product === 'SSP') {
+                            // SSP: 16% P, 12% S
+                            const sspKgs = (pToAdd / 16) * 100;
+                            const rounded = roundToBagUp(sspKgs, 50); // Round UP to ensure minimum
+                            const actualP = (rounded.kgs * 16) / 100;
+                            const actualS = (rounded.kgs * 12) / 100;
+                            
+                            const fertilizerObj = {
+                                name: 'SSP',
+                                kgs: rounded.kgs,
+                                bags: rounded.kgs / 45,
+                                fullBags: Math.floor(rounded.kgs / 45),
+                                remainder: rounded.kgs % 45,
+                                nContributed: 0,
+                                pContributed: actualP,
+                                kContributed: 0,
+                                sContributed: actualS
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P-SSP')) {
+                                cumulativeP += actualP;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Add K deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeK < minRequiredK) {
+            const deficit = totalKRequired - cumulativeK; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // CRITICAL: K not allowed in Tillering (stageIndex === 1)
+            if (lastStageIndex === 1) {
+                console.warn(`[Combination2 Final Rebalancing] Cannot add K to lastStage (${lastStage.stage}) - K not allowed in Tillering stage`);
+            } else {
+                // Calculate already delivered nutrients in lastStage
+                let lastStageDeliveredN = 0;
+                let lastStageDeliveredP = 0;
+                let lastStageDeliveredK = 0;
+                lastStage.fertilizers.forEach(fert => {
+                    lastStageDeliveredN += fert.nContributed || 0;
+                    lastStageDeliveredP += fert.pContributed || 0;
+                    lastStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add K without exceeding stage limit
+                const maxAllowedK = originalStageK - lastStageDeliveredK;
+                const kToAdd = Math.min(deficit, maxAllowedK > 0 ? maxAllowedK : 0);
+                
+                if (kToAdd > 0) {
+                    let kFertilizer = selectKFertilizer(kToAdd, preferences, sStatus, phStatus);
+                    // Fallback: Use MOP if all others are rejected (mandatory to meet minimum)
+                    if (!kFertilizer) {
+                        kFertilizer = 'MOP';
+                    }
+                    if (kFertilizer) {
+                        const kKgs = convertK2OToStraight(kToAdd, kFertilizer.toLowerCase());
+                        const rounded = roundToBagUp(kKgs, 50);
+                        const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                        
+                        const fertilizerObj = {
+                            name: kFertilizer,
+                            kgs: rounded.kgs,
+                            ...rounded,
+                            nContributed: actualNutrients.n || 0,
+                            pContributed: actualNutrients.p || 0,
+                            kContributed: actualNutrients.k
+                        };
+                        
+                        const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                        const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                        
+                        if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-K')) {
+                            cumulativeK += actualNutrients.k;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // STAGE-SAFE TOP-UP PASS: Fill remaining headroom in each stage
+    applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, 'combination2');
+    
+    return recommendations;
+}
+
+// Calculate recommendations for Combination 3: 14-35-14 + 28-28-0
+function calculateCombination3(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+    const recommendations = [];
+    
+    // Stage 1: Basal with 14-35-14
+    const basalP = pPerSplit[0] || 0; // P at basal (60% for paddy, 100% for others)
+    const basalN = nPerSplit[0];
+    const basalK = kPerSplit[0] || 0;
+    
+    const gromor143514 = convertP2O5ToGromorDirect(basalP, '14-35-14', pStatus, locationRec);
+    const rounded143514 = roundToBag(gromor143514);
+    // CRITICAL FIX: Calculate nutrients from ROUNDED quantity, not unrounded
+    const actualNutrients143514 = getNutrientsFromGromor(rounded143514.kgs, '14-35-14');
+    let remainingN = Math.max(0, basalN - actualNutrients143514.n);
+    let remainingK = Math.max(0, basalK - actualNutrients143514.k);
+    
+    const stage1 = {
+        stage: cropData.splits.n.stages[0],
+        fertilizers: []
+    };
+    
+    if (checkPreference('14-35-14', preferences) !== 'Reject' && gromor143514 > 0) {
+        const fertilizerObj = {
+            name: 'Gromor 14-35-14',
+            kgs: rounded143514.kgs,
+            ...rounded143514,
+            nContributed: actualNutrients143514.n,
+            pContributed: (rounded143514.kgs * 35) / 100, // Actual P from rounded quantity
+            kContributed: actualNutrients143514.k
+        };
+        const stageTargets = { n: basalN, p: basalP, k: basalK };
+        const deliveredBefore = { n: 0, p: 0, k: 0 };
+        safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination3-basal-14-35-14');
+    }
+    
+    // Select N fertilizer based on S and pH status - USE safeAddFertilizer
+    if (remainingN > 0) {
+        const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+        if (nFertilizer) {
+            const nKgs = convertNToStraight(remainingN, nFertilizer.toLowerCase());
+            // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+            const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: nFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k || 0
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            if (safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination3-basal-N')) {
+                remainingN = Math.max(0, basalN - (stage1DeliveredN + actualNutrients.n));
+            }
+        }
+    }
+    
+    // Select K fertilizer based on S and pH status - USE safeAddFertilizer
+    if (remainingK > 0) {
+        const kFertilizer = selectKFertilizer(remainingK, preferences, sStatus, phStatus);
+        if (kFertilizer) {
+            const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+            const rounded = roundToBagUp(kKgs, 50);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: kFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n || 0,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination3-basal-K');
+        }
+    }
+    
+    // Calculate actual N, P, K delivered in Stage 1
+    let cumulativeN = 0, cumulativeP = 0, cumulativeK = 0;
+    stage1.fertilizers.forEach(fert => {
+        cumulativeN += fert.nContributed || 0;
+        cumulativeP += fert.pContributed || 0;
+        cumulativeK += fert.kContributed || 0;
+    });
+    
+    // Calculate total N, P, K required and remaining
+    const totalNRequired = nPerSplit.reduce((sum, n) => sum + n, 0);
+    const totalPRequired = pPerSplit.reduce((sum, p) => sum + p, 0);
+    const totalKRequired = kPerSplit.reduce((sum, k) => sum + k, 0);
+    const remainingNTotal = Math.max(0, totalNRequired - cumulativeN);
+    const remainingPTotal = Math.max(0, totalPRequired - cumulativeP);
+    const remainingKTotal = Math.max(0, totalKRequired - cumulativeK);
+    const remainingStages = nPerSplit.length - 1;
+    
+    recommendations.push(stage1);
+    
+    // Stage 2: First Top - USE ORIGINAL STAGE TARGETS (not adjusted/remaining)
+    // EXCEPTION 2: P calculated first because P fertilizers contain N, K, and S
+    if (nPerSplit.length > 1) {
+        // CRITICAL FIX: Use ORIGINAL stage targets, NOT adjusted/remaining values
+        // Stage targets are PRIMARY - we must solve each stage against its original quota
+        const originalStage2N = nPerSplit[1] || 0;
+        const originalStage2P = pPerSplit[1] || 0;
+        const originalStage2K = kPerSplit[1] || 0;
+        
+        const topN = originalStage2N;
+        const topK = originalStage2K;
+        const stage2P = originalStage2P;
+        
+        const stage2 = {
+            stage: cropData.splits.n.stages[1],
+            fertilizers: []
+        };
+        
+        let remainingN = topN;
+        let remainingK = topK;
+        
+        // STEP 1: FIRST fulfill P requirement (if any)
+        // EXCEPTION 4 & 6: Use low P fertilizers (20-20-0-13, 16-20-0-13, 28-28-0) at stage 2
+        // SSP should NOT be used at stage 2 (powder form, difficult to apply at 30 days)
+        if (stage2P > 0) {
+            const pFertilizer = selectP2O5Fertilizer(stage2P, 'at Tillering', preferences, pStatus, locationRec);
+            
+            if (pFertilizer && pFertilizer.method === 'gromor') {
+                const gromorKgs = convertP2O5ToGromorDirect(stage2P, pFertilizer.product, pStatus, locationRec);
+                const nutrients = getNutrientsFromGromor(gromorKgs, pFertilizer.product);
+                const rounded = roundToBag(gromorKgs);
+                
+                // Calculate actual nutrients from rounded quantity
+                const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                const fertilizerObj = {
+                    name: `Gromor ${pFertilizer.product}`,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p, // CRITICAL: Use actual P from rounded quantity, not required
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: topN, p: stage2P, k: topK };
+                const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                
+                if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination3-stage2-P')) {
+                    // Adjust remaining N and K after P fertilizer
+                    remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    remainingK = Math.max(0, topK - (stage2DeliveredK + actualNutrients.k));
+                } else {
+                    console.error(`[Combination2] Failed to add P fertilizer to Tillering - constraint violation!`);
+                }
+            }
+        }
+        
+        // STEP 2: THEN fulfill remaining N requirement with Urea (or other N fertilizer)
+        if (remainingN > 0) {
+            const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                // CRITICAL: Cap N addition to respect stage limit
+                const maxAllowedN = topN - stage2DeliveredN;
+                const nToAdd = Math.min(remainingN, maxAllowedN > 0 ? maxAllowedN : 0);
+                
+                if (nToAdd > 0) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination3-stage2-N')) {
+                        remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    }
+                }
+            }
+        }
+        
+        // STEP 3: Add K fertilizer if needed - BUT K NOT ALLOWED IN TILLERING (stageIndex === 1)
+        // CRITICAL: K must be 0 in Tillering stage - skip K addition
+        // Only add K if remainingK is significant (> 0.5 kg) to avoid excessive rounding
+        if (remainingK > 0.5) {
+            // CRITICAL FIX: Stage 2 is Tillering (index 1) - K not allowed
+            const stage2Index = 1; // Tillering stage
+            if (stage2Index === 1) {
+                const comboName = 'Combination';
+                console.warn(`[${comboName}] Stage 2 (Tillering): K remaining=${remainingK.toFixed(2)} but K not allowed in Tillering - skipping K addition`);
+                // Do not add K fertilizer in Tillering stage
+            } else {
+                const kFertilizer = selectKFertilizer(remainingK, preferences, sStatus, phStatus);
+                if (kFertilizer) {
+                    const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+                    // Use roundToBag (rounds to nearest) instead of roundToBagUp to minimize excess
+                    const rounded = roundToBag(kKgs);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: kFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n || 0,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k
+                    };
+                    
+                    // Calculate delivered nutrients so far in stage2
+                    let stage2DeliveredN = 0;
+                    let stage2DeliveredP = 0;
+                    let stage2DeliveredK = 0;
+                    stage2.fertilizers.forEach(fert => {
+                        stage2DeliveredN += fert.nContributed || 0;
+                        stage2DeliveredP += fert.pContributed || 0;
+                        stage2DeliveredK += fert.kContributed || 0;
+                    });
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    // Use safeAddFertilizer to enforce constraints
+                    const comboName = 'combination';
+                    safeAddFertilizer(stage2, fertilizerObj, stage2Index, stageTargets, deliveredBefore, `${comboName}-stage2-K`);
+                }
+            }
+        }
+        
+        // Update cumulative N, P, K after Stage 2
+        stage2.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        // CRITICAL: Validate Stage 2 against original targets
+        let stage2FinalN = 0;
+        let stage2FinalP = 0;
+        let stage2FinalK = 0;
+        stage2.fertilizers.forEach(fert => {
+            stage2FinalN += fert.nContributed || 0;
+            stage2FinalP += fert.pContributed || 0;
+            stage2FinalK += fert.kContributed || 0;
+        });
+        
+        const stage2NCap = topN * 1.12; // 12% tolerance
+        const stage2PCap = stage2P * 1.12;
+        const stage2KCap = topK * 1.12;
+        
+        if (stage2FinalN > stage2NCap) {
+            console.error(`[Combination3] Stage 2 (Tillering) N OVERFLOW: ${stage2FinalN.toFixed(2)} > ${stage2NCap.toFixed(2)} (target: ${topN.toFixed(2)})`);
+        }
+        if (stage2FinalP > stage2PCap) {
+            console.error(`[Combination3] Stage 2 (Tillering) P OVERFLOW: ${stage2FinalP.toFixed(2)} > ${stage2PCap.toFixed(2)} (target: ${stage2P.toFixed(2)})`);
+        }
+        if (stage2FinalK > 0.01) {
+            console.error(`[Combination3] Stage 2 (Tillering) K VIOLATION: ${stage2FinalK.toFixed(2)} > 0 (K not allowed in Tillering)`);
+        }
+        
+        recommendations.push(stage2);
+    }
+    
+    // Additional stages - USE ORIGINAL STAGE TARGETS (no rebalancing)
+    for (let i = 2; i < nPerSplit.length; i++) {
+        // STRICT: Use original stage targets (no rebalancing to compensate for earlier deficits)
+        const stageN = nPerSplit[i] || 0; // Original N target (1/3 rule)
+        const stageP = pPerSplit[i] || 0; // Original P split (0 for Panicle)
+        const stageK = kPerSplit[i] || 0; // Original K split (50% for Panicle)
+        
+        if (stageN <= 0 && stageK <= 0 && stageP <= 0) continue;
+        
+        const stage = {
+            stage: cropData.splits.n.stages[i] || `Stage ${i + 1}`,
+            fertilizers: []
+        };
+        
+        let deliveredN = 0;
+        let deliveredP = 0;
+        let deliveredK = 0;
+        
+        // Select N fertilizer based on S and pH status - USE safeAddFertilizer
+        if (stageN > 0) {
+            const nFertilizer = selectNFertilizer(stageN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                const nKgs = convertNToStraight(stageN, nFertilizer.toLowerCase());
+                // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                
+                const fertilizerObj = {
+                    name: nFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: stageN, p: stageP, k: stageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination3-stage3+-N')) {
+                    deliveredN += actualNutrients.n;
+                }
+            }
+        }
+        
+        // Select K fertilizer based on S and pH status - USE safeAddFertilizer
+        if (stageK > 0) {
+            const kFertilizer = selectKFertilizer(stageK, preferences, sStatus, phStatus);
+            if (kFertilizer) {
+                const kKgs = convertK2OToStraight(stageK, kFertilizer.toLowerCase());
+                const rounded = roundToBagUp(kKgs, 50);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                
+                const fertilizerObj = {
+                    name: kFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n || 0,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k
+                };
+                
+                const stageTargets = { n: stageN, p: stageP, k: stageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination3-stage3+-K')) {
+                    deliveredK += actualNutrients.k;
+                }
+            }
+        }
+        
+        // Update cumulative N, P, K after each stage
+        stage.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        if (stage.fertilizers.length > 0) {
+            recommendations.push(stage);
+        }
+    }
+    
+    // FINAL REBALANCING: If total N, P, K are still below minimum, add to appropriate stage
+    // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+    const minRequiredN = totalNRequired * 0.88; // 12% tolerance
+    const minRequiredP = totalPRequired * 0.88;
+    const minRequiredK = totalKRequired * 0.88;
+    
+    if (recommendations.length > 0) {
+        // For Paddy: P should be at Stage 2 (tillering), not Stage 3
+        // Find Stage 2 (index 1) if it exists, otherwise use last stage
+        const stage2Index = recommendations.findIndex(s => s.stage && s.stage.toLowerCase().includes('tillering'));
+        const pStage = stage2Index >= 0 ? recommendations[stage2Index] : recommendations[recommendations.length - 1];
+        const lastStage = recommendations[recommendations.length - 1];
+        
+        // Add N deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeN < minRequiredN) {
+            const deficit = totalNRequired - cumulativeN; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // Calculate already delivered nutrients in lastStage
+            let lastStageDeliveredN = 0;
+            let lastStageDeliveredP = 0;
+            let lastStageDeliveredK = 0;
+            lastStage.fertilizers.forEach(fert => {
+                lastStageDeliveredN += fert.nContributed || 0;
+                lastStageDeliveredP += fert.pContributed || 0;
+                lastStageDeliveredK += fert.kContributed || 0;
+            });
+            
+            // Check if we can add N without exceeding stage limit
+            const maxAllowedN = originalStageN - lastStageDeliveredN;
+            const nToAdd = Math.min(deficit, maxAllowedN > 0 ? maxAllowedN : 0);
+            
+            if (nToAdd > 0) {
+                // Try to get N fertilizer, but if preferences reject all, use Urea anyway (mandatory)
+                let nFertilizer = selectNFertilizer(nToAdd, preferences, sStatus, phStatus);
+                if (!nFertilizer) {
+                    // Fallback: Use Urea if all others are rejected (mandatory to meet minimum)
+                    nFertilizer = 'Urea';
+                }
+                if (nFertilizer) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL: Always round UP to ensure we meet minimum (never round down)
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                    const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                    
+                    if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-N')) {
+                        cumulativeN += actualNutrients.n;
+                    }
+                }
+            }
+        }
+        
+        // Add P deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+        if (cumulativeP < minRequiredP) {
+            const deficit = totalPRequired - cumulativeP; // Use full requirement, not just 88%
+            
+            // Determine which stage is pStage (should be Stage 2/Tillering for Paddy)
+            const pStageIndex = stage2Index >= 0 ? 1 : recommendations.length - 1;
+            const originalStageN = nPerSplit[pStageIndex] || 0;
+            const originalStageP = pPerSplit[pStageIndex] || 0;
+            const originalStageK = kPerSplit[pStageIndex] || 0;
+            
+            // CRITICAL: P not allowed in Panicle (stageIndex === 2)
+            if (pStageIndex === 2) {
+                console.warn(`[Combination3 Final Rebalancing] Cannot add P to pStage (${pStage.stage}) - P not allowed in Panicle stage`);
+            } else {
+                // Calculate already delivered nutrients in pStage
+                let pStageDeliveredN = 0;
+                let pStageDeliveredP = 0;
+                let pStageDeliveredK = 0;
+                pStage.fertilizers.forEach(fert => {
+                    pStageDeliveredN += fert.nContributed || 0;
+                    pStageDeliveredP += fert.pContributed || 0;
+                    pStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add P without exceeding stage limit
+                const maxAllowedP = originalStageP - pStageDeliveredP;
+                const pToAdd = Math.min(deficit, maxAllowedP > 0 ? maxAllowedP : 0);
+                
+                if (pToAdd > 0) {
+                    // Try to add P through appropriate fertilizer
+                    let pFertilizer = selectP2O5Fertilizer(pToAdd, 'Final', preferences, pStatus, locationRec);
+                    // If no Gromor product available or rejected, use SSP as fallback (MANDATORY to meet minimum)
+                    if (!pFertilizer || (pFertilizer.method === 'gromor' && checkPreference(pFertilizer.product, preferences) === 'Reject')) {
+                        // MANDATORY: Use SSP even if rejected - meeting minimum is required
+                        pFertilizer = { product: 'SSP', method: 'straight' };
+                    }
+                    
+                    // Always add P fertilizer (mandatory to meet minimum)
+                    // CRITICAL: Add to Stage 2 (tillering) for Paddy, not Stage 3
+                    if (pFertilizer) {
+                        if (pFertilizer && pFertilizer.method === 'gromor') {
+                            const gromorKgs = convertP2O5ToGromorDirect(pToAdd, pFertilizer.product, pStatus, locationRec);
+                            const rounded = roundToBagUp(gromorKgs, 50); // Round UP to ensure minimum
+                            const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                            
+                            const fertilizerObj = {
+                                name: `Gromor ${pFertilizer.product}`,
+                                kgs: rounded.kgs,
+                                ...rounded,
+                                nContributed: actualNutrients.n,
+                                pContributed: actualNutrients.p,
+                                kContributed: actualNutrients.k || 0
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P')) {
+                                cumulativeP += actualNutrients.p;
+                            }
+                        } else if (pFertilizer.method === 'straight' && pFertilizer.product === 'SSP') {
+                            // SSP: 16% P, 12% S
+                            const sspKgs = (pToAdd / 16) * 100;
+                            const rounded = roundToBagUp(sspKgs, 50); // Round UP to ensure minimum
+                            const actualP = (rounded.kgs * 16) / 100;
+                            const actualS = (rounded.kgs * 12) / 100;
+                            
+                            const fertilizerObj = {
+                                name: 'SSP',
+                                kgs: rounded.kgs,
+                                bags: rounded.kgs / 45,
+                                fullBags: Math.floor(rounded.kgs / 45),
+                                remainder: rounded.kgs % 45,
+                                nContributed: 0,
+                                pContributed: actualP,
+                                kContributed: 0,
+                                sContributed: actualS
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P-SSP')) {
+                                cumulativeP += actualP;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Add K deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeK < minRequiredK) {
+            const deficit = totalKRequired - cumulativeK; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // CRITICAL: K not allowed in Tillering (stageIndex === 1)
+            if (lastStageIndex === 1) {
+                console.warn(`[Combination3 Final Rebalancing] Cannot add K to lastStage (${lastStage.stage}) - K not allowed in Tillering stage`);
+            } else {
+                // Calculate already delivered nutrients in lastStage
+                let lastStageDeliveredN = 0;
+                let lastStageDeliveredP = 0;
+                let lastStageDeliveredK = 0;
+                lastStage.fertilizers.forEach(fert => {
+                    lastStageDeliveredN += fert.nContributed || 0;
+                    lastStageDeliveredP += fert.pContributed || 0;
+                    lastStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add K without exceeding stage limit
+                const maxAllowedK = originalStageK - lastStageDeliveredK;
+                const kToAdd = Math.min(deficit, maxAllowedK > 0 ? maxAllowedK : 0);
+                
+                if (kToAdd > 0) {
+                    let kFertilizer = selectKFertilizer(kToAdd, preferences, sStatus, phStatus);
+                    // Fallback: Use MOP if all others are rejected (mandatory to meet minimum)
+                    if (!kFertilizer) {
+                        kFertilizer = 'MOP';
+                    }
+                    if (kFertilizer) {
+                        const kKgs = convertK2OToStraight(kToAdd, kFertilizer.toLowerCase());
+                        const rounded = roundToBagUp(kKgs, 50);
+                        const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                        
+                        const fertilizerObj = {
+                            name: kFertilizer,
+                            kgs: rounded.kgs,
+                            ...rounded,
+                            nContributed: actualNutrients.n || 0,
+                            pContributed: actualNutrients.p || 0,
+                            kContributed: actualNutrients.k
+                        };
+                        
+                        const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                        const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                        
+                        if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-K')) {
+                            cumulativeK += actualNutrients.k;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // STAGE-SAFE TOP-UP PASS: Fill remaining headroom in each stage
+    applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, 'combination3');
+    
+    return recommendations;
+}
+
+// Calculate recommendations for Combination 4: 28-28-0 + 10-26-26
+function calculateCombination4(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+    const recommendations = [];
+    
+    // Stage 1: Basal with 28-28-0
+    const basalP = pPerSplit[0] || 0; // P at basal (60% for paddy, 100% for others)
+    const basalN = nPerSplit[0];
+    const basalK = kPerSplit[0] || 0;
+    
+    const gromor28280 = convertP2O5ToGromor(basalP, '28-28-0');
+    // Note: remainingN will be recalculated after rounding
+    let remainingN = basalN;
+    const remainingK = Math.max(0, basalK);
+    
+    const stage1 = {
+        stage: cropData.splits.n.stages[0],
+        fertilizers: []
+    };
+    
+    if (checkPreference('28-28-0', preferences) !== 'Reject' && gromor28280 > 0) {
+        const rounded28280 = roundToBag(gromor28280);
+        // CRITICAL FIX: Calculate nutrients from ROUNDED quantity, not unrounded
+        const actualNutrients28280 = getNutrientsFromGromor(rounded28280.kgs, '28-28-0');
+        
+        const fertilizerObj = {
+            name: 'Gromor 28-28-0',
+            kgs: rounded28280.kgs,
+            ...rounded28280,
+            nContributed: actualNutrients28280.n,
+            pContributed: (rounded28280.kgs * 28) / 100, // Actual P from rounded quantity
+            kContributed: 0
+        };
+        const stageTargets = { n: basalN, p: basalP, k: basalK };
+        const deliveredBefore = { n: 0, p: 0, k: 0 };
+        if (safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination4-basal-28-28-0')) {
+            // Recalculate remainingN based on ACTUAL nutrients from rounded quantity
+            remainingN = Math.max(0, basalN - actualNutrients28280.n);
+        }
+    }
+    
+    // Use 10-26-26 for K if needed - USE safeAddFertilizer
+    if (remainingK > 0 && checkPreference('10-26-26', preferences) !== 'Reject') {
+        // Use 10-26-26 for partial K requirement
+        const partialK = remainingK * 0.5;
+        const partialP = partialK * 1.0; // 10-26-26 has 26% P, use K requirement as guide
+        const gromor102626 = convertP2O5ToGromorDirect(partialP, '10-26-26', pStatus, locationRec);
+        // Note: nutrients will be calculated from rounded quantity
+        
+        if (gromor102626 > 0) {
+            const rounded102626 = roundToBag(gromor102626);
+            // CRITICAL FIX: Calculate nutrients from ROUNDED quantity
+            const actualNutrients102626 = getNutrientsFromGromor(rounded102626.kgs, '10-26-26');
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: 'Gromor 10-26-26',
+                kgs: rounded102626.kgs,
+                ...rounded102626,
+                nContributed: actualNutrients102626.n,
+                pContributed: (rounded102626.kgs * 26) / 100, // Actual P from rounded quantity
+                kContributed: actualNutrients102626.k
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            if (safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination4-basal-10-26-26')) {
+                // Recalculate remainingN and remainingK based on ACTUAL nutrients
+                remainingN = Math.max(0, remainingN - actualNutrients102626.n);
+                const finalRemainingK = Math.max(0, remainingK - actualNutrients102626.k);
+                // Update remainingK for MOP calculation
+                remainingK = finalRemainingK;
+            }
+        }
+        
+        if (remainingK > 0 && checkPreference('MOP', preferences) !== 'Reject') {
+            const mopKgs = convertK2OToStraight(remainingK, 'mop');
+            const rounded = roundToBagUp(mopKgs);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, 'mop');
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: 'MOP',
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n || 0,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination4-basal-MOP');
+        }
+    }
+    
+    if (remainingN > 0 && checkPreference('Urea', preferences) !== 'Reject') {
+        const ureaKgs = convertNToStraight(remainingN, 'urea');
+        // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+        const rounded = roundToBagUp(ureaKgs);
+        const actualNutrients = getNutrientsFromStraight(rounded.kgs, 'urea');
+        
+        // Calculate delivered nutrients so far in stage1
+        let stage1DeliveredN = 0;
+        let stage1DeliveredP = 0;
+        let stage1DeliveredK = 0;
+        stage1.fertilizers.forEach(fert => {
+            stage1DeliveredN += fert.nContributed || 0;
+            stage1DeliveredP += fert.pContributed || 0;
+            stage1DeliveredK += fert.kContributed || 0;
+        });
+        
+        const fertilizerObj = {
+            name: 'Urea',
+            kgs: rounded.kgs,
+            ...rounded,
+            nContributed: actualNutrients.n,
+            pContributed: actualNutrients.p || 0,
+            kContributed: actualNutrients.k || 0
+        };
+        
+        const stageTargets = { n: basalN, p: basalP, k: basalK };
+        const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+        
+        if (safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination4-basal-Urea')) {
+            remainingN = Math.max(0, basalN - (stage1DeliveredN + actualNutrients.n));
+        }
+    }
+    
+    // Calculate actual N, P, K delivered in Stage 1
+    let cumulativeN = 0, cumulativeP = 0, cumulativeK = 0;
+    stage1.fertilizers.forEach(fert => {
+        cumulativeN += fert.nContributed || 0;
+        cumulativeP += fert.pContributed || 0;
+        cumulativeK += fert.kContributed || 0;
+    });
+    
+    // Calculate total N, P, K required and remaining
+    const totalNRequired = nPerSplit.reduce((sum, n) => sum + n, 0);
+    const totalPRequired = pPerSplit.reduce((sum, p) => sum + p, 0);
+    const totalKRequired = kPerSplit.reduce((sum, k) => sum + k, 0);
+    const remainingNTotal = Math.max(0, totalNRequired - cumulativeN);
+    const remainingPTotal = Math.max(0, totalPRequired - cumulativeP);
+    const remainingKTotal = Math.max(0, totalKRequired - cumulativeK);
+    const remainingStages = nPerSplit.length - 1;
+    
+    recommendations.push(stage1);
+    
+    // Additional stages - USE ORIGINAL STAGE TARGETS (no rebalancing)
+    // EXCEPTION 2: P calculated first because P fertilizers contain N, K, and S
+    for (let i = 1; i < nPerSplit.length; i++) {
+        // STRICT: Use original stage targets (no rebalancing to compensate for earlier deficits)
+        const stageN = nPerSplit[i] || 0; // Original N target (1/3 rule)
+        const stageP = pPerSplit[i] || 0; // Original P split (40% for Tillering, 0 for Panicle)
+        const stageK = kPerSplit[i] || 0; // Original K split (0 for Tillering, 50% for Panicle)
+        
+        if (stageN <= 0 && stageK <= 0 && stageP <= 0) continue;
+        
+        const stage = {
+            stage: cropData.splits.n.stages[i] || `Stage ${i + 1}`,
+            fertilizers: []
+        };
+        
+        let remainingN = stageN;
+        let remainingK = stageK;
+        let deliveredN = 0;
+        let deliveredP = 0;
+        let deliveredK = 0;
+        
+        // STEP 1: FIRST fulfill P requirement (if any)
+        // EXCEPTION 4 & 6: Use low P fertilizers (20-20-0-13, 16-20-0-13, 28-28-0) at stage 2
+        // SSP should NOT be used at stage 2 (powder form, difficult to apply at 30 days)
+        if (i === 1 && stageP > 0) {
+            const pFertilizer = selectP2O5Fertilizer(stageP, 'at Tillering', preferences, pStatus, locationRec);
+            
+            if (pFertilizer && pFertilizer.method === 'gromor') {
+                const gromorKgs = convertP2O5ToGromorDirect(stageP, pFertilizer.product, pStatus, locationRec);
+                const nutrients = getNutrientsFromGromor(gromorKgs, pFertilizer.product);
+                const rounded = roundToBag(gromorKgs);
+                
+                // Calculate actual nutrients from rounded quantity
+                const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                
+                const fertilizerObj = {
+                    name: `Gromor ${pFertilizer.product}`,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p, // Use actual P from rounded quantity
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: stageN, p: stageP, k: stageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination4-stage2-P')) {
+                    deliveredN += actualNutrients.n;
+                    deliveredP += actualNutrients.p;
+                    deliveredK += actualNutrients.k || 0;
+                    // Adjust remaining N and K after P fertilizer
+                    remainingN = Math.max(0, stageN - deliveredN);
+                    remainingK = Math.max(0, stageK - deliveredK);
+                } else {
+                    console.error(`[Combination4] Failed to add P fertilizer to Stage ${i} - constraint violation!`);
+                }
+            }
+        }
+        
+        // STEP 2: THEN fulfill remaining N requirement with Urea (or other N fertilizer)
+        if (remainingN > 0) {
+            const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                // Recalculate delivered nutrients
+                deliveredN = 0;
+                deliveredP = 0;
+                deliveredK = 0;
+                stage.fertilizers.forEach(fert => {
+                    deliveredN += fert.nContributed || 0;
+                    deliveredP += fert.pContributed || 0;
+                    deliveredK += fert.kContributed || 0;
+                });
+                
+                // CRITICAL: Cap N addition to respect stage limit
+                const maxAllowedN = stageN - deliveredN;
+                const nToAdd = Math.min(remainingN, maxAllowedN > 0 ? maxAllowedN : 0);
+                
+                if (nToAdd > 0) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: stageN, p: stageP, k: stageK };
+                    const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                    
+                    if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination4-stage-N')) {
+                        deliveredN += actualNutrients.n;
+                    }
+                }
+            }
+        }
+        
+        // STEP 3: Add K fertilizer if needed - BUT K NOT ALLOWED IN TILLERING (i === 1)
+        // Only add K if remainingK is significant (> 0.5 kg) to avoid excessive rounding
+        if (remainingK > 0.5) {
+            // CRITICAL: K not allowed in Tillering (i === 1)
+            if (i === 1) {
+                console.warn(`[Combination4] Stage ${i} (Tillering): K remaining=${remainingK.toFixed(2)} but K not allowed in Tillering - skipping K addition`);
+            } else {
+                const kFertilizer = selectKFertilizer(remainingK, preferences, sStatus, phStatus);
+                if (kFertilizer) {
+                    // Recalculate delivered nutrients
+                    deliveredN = 0;
+                    deliveredP = 0;
+                    deliveredK = 0;
+                    stage.fertilizers.forEach(fert => {
+                        deliveredN += fert.nContributed || 0;
+                        deliveredP += fert.pContributed || 0;
+                        deliveredK += fert.kContributed || 0;
+                    });
+                    
+                    const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+                    // Use roundToBag (rounds to nearest) instead of roundToBagUp to minimize excess
+                    const rounded = roundToBag(kKgs);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: kFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n || 0,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k
+                    };
+                    
+                    const stageTargets = { n: stageN, p: stageP, k: stageK };
+                    const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                    
+                    safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination4-stage-K');
+                }
+            }
+        }
+        
+        // CRITICAL: Validate Stage 2 (i === 1) against original targets
+        if (i === 1) {
+            let stage2FinalN = 0;
+            let stage2FinalP = 0;
+            let stage2FinalK = 0;
+            stage.fertilizers.forEach(fert => {
+                stage2FinalN += fert.nContributed || 0;
+                stage2FinalP += fert.pContributed || 0;
+                stage2FinalK += fert.kContributed || 0;
+            });
+            
+            const stage2NCap = stageN * 1.12; // 12% tolerance
+            const stage2PCap = stageP * 1.12;
+            const stage2KCap = stageK * 1.12;
+            
+            if (stage2FinalN > stage2NCap) {
+                console.error(`[Combination4] Stage 2 (Tillering) N OVERFLOW: ${stage2FinalN.toFixed(2)} > ${stage2NCap.toFixed(2)} (target: ${stageN.toFixed(2)})`);
+            }
+            if (stage2FinalP > stage2PCap) {
+                console.error(`[Combination4] Stage 2 (Tillering) P OVERFLOW: ${stage2FinalP.toFixed(2)} > ${stage2PCap.toFixed(2)} (target: ${stageP.toFixed(2)})`);
+            }
+            if (stage2FinalK > 0.01) {
+                console.error(`[Combination4] Stage 2 (Tillering) K VIOLATION: ${stage2FinalK.toFixed(2)} > 0 (K not allowed in Tillering)`);
+            }
+        }
+        
+        // Update cumulative N, P, K after each stage
+        stage.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        if (stage.fertilizers.length > 0) {
+            recommendations.push(stage);
+        }
+    }
+    
+    // FINAL REBALANCING: If total N, P, K are still below minimum, add to appropriate stage
+    // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+    const minRequiredN = totalNRequired * 0.88; // 12% tolerance
+    const minRequiredP = totalPRequired * 0.88;
+    const minRequiredK = totalKRequired * 0.88;
+    
+    if (recommendations.length > 0) {
+        // For Paddy: P should be at Stage 2 (tillering), not Stage 3
+        // Find Stage 2 (index 1) if it exists, otherwise use last stage
+        const stage2Index = recommendations.findIndex(s => s.stage && s.stage.toLowerCase().includes('tillering'));
+        const pStage = stage2Index >= 0 ? recommendations[stage2Index] : recommendations[recommendations.length - 1];
+        const lastStage = recommendations[recommendations.length - 1];
+        
+        // Add N deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeN < minRequiredN) {
+            const deficit = totalNRequired - cumulativeN; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // Calculate already delivered nutrients in lastStage
+            let lastStageDeliveredN = 0;
+            let lastStageDeliveredP = 0;
+            let lastStageDeliveredK = 0;
+            lastStage.fertilizers.forEach(fert => {
+                lastStageDeliveredN += fert.nContributed || 0;
+                lastStageDeliveredP += fert.pContributed || 0;
+                lastStageDeliveredK += fert.kContributed || 0;
+            });
+            
+            // Check if we can add N without exceeding stage limit
+            const maxAllowedN = originalStageN - lastStageDeliveredN;
+            const nToAdd = Math.min(deficit, maxAllowedN > 0 ? maxAllowedN : 0);
+            
+            if (nToAdd > 0) {
+                // Try to get N fertilizer, but if preferences reject all, use Urea anyway (mandatory)
+                let nFertilizer = selectNFertilizer(nToAdd, preferences, sStatus, phStatus);
+                if (!nFertilizer) {
+                    // Fallback: Use Urea if all others are rejected (mandatory to meet minimum)
+                    nFertilizer = 'Urea';
+                }
+                if (nFertilizer) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL: Always round UP to ensure we meet minimum (never round down)
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                    const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                    
+                    if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-N')) {
+                        cumulativeN += actualNutrients.n;
+                    }
+                }
+            }
+        }
+        
+        // Add P deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+        if (cumulativeP < minRequiredP) {
+            const deficit = totalPRequired - cumulativeP; // Use full requirement, not just 88%
+            
+            // Determine which stage is pStage (should be Stage 2/Tillering for Paddy)
+            const pStageIndex = stage2Index >= 0 ? 1 : recommendations.length - 1;
+            const originalStageN = nPerSplit[pStageIndex] || 0;
+            const originalStageP = pPerSplit[pStageIndex] || 0;
+            const originalStageK = kPerSplit[pStageIndex] || 0;
+            
+            // CRITICAL: P not allowed in Panicle (stageIndex === 2)
+            if (pStageIndex === 2) {
+                console.warn(`[Combination4 Final Rebalancing] Cannot add P to pStage (${pStage.stage}) - P not allowed in Panicle stage`);
+            } else {
+                // Calculate already delivered nutrients in pStage
+                let pStageDeliveredN = 0;
+                let pStageDeliveredP = 0;
+                let pStageDeliveredK = 0;
+                pStage.fertilizers.forEach(fert => {
+                    pStageDeliveredN += fert.nContributed || 0;
+                    pStageDeliveredP += fert.pContributed || 0;
+                    pStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add P without exceeding stage limit
+                const maxAllowedP = originalStageP - pStageDeliveredP;
+                const pToAdd = Math.min(deficit, maxAllowedP > 0 ? maxAllowedP : 0);
+                
+                if (pToAdd > 0) {
+                    // Try to add P through appropriate fertilizer
+                    let pFertilizer = selectP2O5Fertilizer(pToAdd, 'Final', preferences, pStatus, locationRec);
+                    // If no Gromor product available or rejected, use SSP as fallback (MANDATORY to meet minimum)
+                    if (!pFertilizer || (pFertilizer.method === 'gromor' && checkPreference(pFertilizer.product, preferences) === 'Reject')) {
+                        // MANDATORY: Use SSP even if rejected - meeting minimum is required
+                        pFertilizer = { product: 'SSP', method: 'straight' };
+                    }
+                    
+                    // Always add P fertilizer (mandatory to meet minimum)
+                    // CRITICAL: Add to Stage 2 (tillering) for Paddy, not Stage 3
+                    if (pFertilizer) {
+                        if (pFertilizer && pFertilizer.method === 'gromor') {
+                            const gromorKgs = convertP2O5ToGromorDirect(pToAdd, pFertilizer.product, pStatus, locationRec);
+                            const rounded = roundToBagUp(gromorKgs, 50); // Round UP to ensure minimum
+                            const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                            
+                            const fertilizerObj = {
+                                name: `Gromor ${pFertilizer.product}`,
+                                kgs: rounded.kgs,
+                                ...rounded,
+                                nContributed: actualNutrients.n,
+                                pContributed: actualNutrients.p,
+                                kContributed: actualNutrients.k || 0
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P')) {
+                                cumulativeP += actualNutrients.p;
+                            }
+                        } else if (pFertilizer.method === 'straight' && pFertilizer.product === 'SSP') {
+                            // SSP: 16% P, 12% S
+                            const sspKgs = (pToAdd / 16) * 100;
+                            const rounded = roundToBagUp(sspKgs, 50); // Round UP to ensure minimum
+                            const actualP = (rounded.kgs * 16) / 100;
+                            const actualS = (rounded.kgs * 12) / 100;
+                            
+                            const fertilizerObj = {
+                                name: 'SSP',
+                                kgs: rounded.kgs,
+                                bags: rounded.kgs / 45,
+                                fullBags: Math.floor(rounded.kgs / 45),
+                                remainder: rounded.kgs % 45,
+                                nContributed: 0,
+                                pContributed: actualP,
+                                kContributed: 0,
+                                sContributed: actualS
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P-SSP')) {
+                                cumulativeP += actualP;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Add K deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeK < minRequiredK) {
+            const deficit = totalKRequired - cumulativeK; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // CRITICAL: K not allowed in Tillering (stageIndex === 1)
+            if (lastStageIndex === 1) {
+                console.warn(`[Combination4 Final Rebalancing] Cannot add K to lastStage (${lastStage.stage}) - K not allowed in Tillering stage`);
+            } else {
+                // Calculate already delivered nutrients in lastStage
+                let lastStageDeliveredN = 0;
+                let lastStageDeliveredP = 0;
+                let lastStageDeliveredK = 0;
+                lastStage.fertilizers.forEach(fert => {
+                    lastStageDeliveredN += fert.nContributed || 0;
+                    lastStageDeliveredP += fert.pContributed || 0;
+                    lastStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add K without exceeding stage limit
+                const maxAllowedK = originalStageK - lastStageDeliveredK;
+                const kToAdd = Math.min(deficit, maxAllowedK > 0 ? maxAllowedK : 0);
+                
+                if (kToAdd > 0) {
+                    let kFertilizer = selectKFertilizer(kToAdd, preferences, sStatus, phStatus);
+                    // Fallback: Use MOP if all others are rejected (mandatory to meet minimum)
+                    if (!kFertilizer) {
+                        kFertilizer = 'MOP';
+                    }
+                    if (kFertilizer) {
+                        const kKgs = convertK2OToStraight(kToAdd, kFertilizer.toLowerCase());
+                        const rounded = roundToBagUp(kKgs, 50);
+                        const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                        
+                        const fertilizerObj = {
+                            name: kFertilizer,
+                            kgs: rounded.kgs,
+                            ...rounded,
+                            nContributed: actualNutrients.n || 0,
+                            pContributed: actualNutrients.p || 0,
+                            kContributed: actualNutrients.k
+                        };
+                        
+                        const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                        const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                        
+                        if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-K')) {
+                            cumulativeK += actualNutrients.k;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // STAGE-SAFE TOP-UP PASS: Fill remaining headroom in each stage
+    applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, 'combination4');
+    
+    return recommendations;
+}
+
+// Calculate recommendations for Combination 5: 28-28-0 + 16-20-0
+function calculateCombination5(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+    const recommendations = [];
+    
+    // Stage 1: Basal with 28-28-0
+    const basalP = pPerSplit[0] || 0; // P at basal (60% for paddy, 100% for others)
+    const basalN = nPerSplit[0];
+    const basalK = kPerSplit[0] || 0;
+    
+    const gromor28280 = convertP2O5ToGromorDirect(basalP, '28-28-0', pStatus, locationRec);
+    const rounded28280 = roundToBag(gromor28280);
+    // CRITICAL FIX: Calculate nutrients from ROUNDED quantity, not unrounded
+    const actualNutrients28280 = getNutrientsFromGromor(rounded28280.kgs, '28-28-0');
+    let remainingN = Math.max(0, basalN - actualNutrients28280.n);
+    
+    const stage1 = {
+        stage: cropData.splits.n.stages[0],
+        fertilizers: []
+    };
+    
+        if (checkPreference('28-28-0', preferences) !== 'Reject' && gromor28280 > 0) {
+            const fertilizerObj = {
+                name: 'Gromor 28-28-0',
+                kgs: rounded28280.kgs,
+                ...rounded28280,
+                nContributed: actualNutrients28280.n,
+                pContributed: (rounded28280.kgs * 28) / 100, // Actual P from rounded quantity
+                kContributed: 0
+            };
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: 0, p: 0, k: 0 };
+            safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination5-basal-28-28-0');
+        }
+    
+    // Select N fertilizer based on S and pH status - USE safeAddFertilizer
+    if (remainingN > 0) {
+        const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+        if (nFertilizer) {
+            const nKgs = convertNToStraight(remainingN, nFertilizer.toLowerCase());
+            // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+            const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: nFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k || 0
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            if (safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination5-basal-N')) {
+                remainingN = Math.max(0, basalN - (stage1DeliveredN + actualNutrients.n));
+            }
+        }
+    }
+    
+    // Select K fertilizer based on S and pH status - USE safeAddFertilizer
+    if (basalK > 0) {
+        const kFertilizer = selectKFertilizer(basalK, preferences, sStatus, phStatus);
+        if (kFertilizer) {
+            const kKgs = convertK2OToStraight(basalK, kFertilizer.toLowerCase());
+            const rounded = roundToBagUp(kKgs, 50);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: kFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n || 0,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination5-basal-K');
+        }
+    }
+    
+    // Calculate actual N, P, K delivered in Stage 1
+    let cumulativeN = 0, cumulativeP = 0, cumulativeK = 0;
+    stage1.fertilizers.forEach(fert => {
+        cumulativeN += fert.nContributed || 0;
+        cumulativeP += fert.pContributed || 0;
+        cumulativeK += fert.kContributed || 0;
+    });
+    
+    // Calculate total N, P, K required and remaining
+    const totalNRequired = nPerSplit.reduce((sum, n) => sum + n, 0);
+    const totalPRequired = pPerSplit.reduce((sum, p) => sum + p, 0);
+    const totalKRequired = kPerSplit.reduce((sum, k) => sum + k, 0);
+    const remainingNTotal = Math.max(0, totalNRequired - cumulativeN);
+    const remainingPTotal = Math.max(0, totalPRequired - cumulativeP);
+    const remainingKTotal = Math.max(0, totalKRequired - cumulativeK);
+    const remainingStages = nPerSplit.length - 1;
+    
+    recommendations.push(stage1);
+    
+    // Stage 2: First Top - USE ORIGINAL STAGE TARGETS (not adjusted/remaining)
+    // EXCEPTION 2: P calculated first because P fertilizers contain N, K, and S
+    if (nPerSplit.length > 1) {
+        // CRITICAL FIX: Use ORIGINAL stage targets, NOT adjusted/remaining values
+        // Stage targets are PRIMARY - we must solve each stage against its original quota
+        const originalStage2N = nPerSplit[1] || 0;
+        const originalStage2P = pPerSplit[1] || 0;
+        const originalStage2K = kPerSplit[1] || 0;
+        
+        const topN = originalStage2N;
+        const topK = originalStage2K;
+        const stage2P = originalStage2P;
+        
+        const stage2 = {
+            stage: cropData.splits.n.stages[1],
+            fertilizers: []
+        };
+        
+        let remainingN = topN;
+        let remainingK = topK;
+        
+        // STEP 1: FIRST fulfill P requirement (if any)
+        // EXCEPTION 4 & 6: Use low P fertilizers (20-20-0-13, 16-20-0-13, 28-28-0) at stage 2
+        // SSP should NOT be used at stage 2 (powder form, difficult to apply at 30 days)
+        if (stage2P > 0) {
+            const pFertilizer = selectP2O5Fertilizer(stage2P, 'at Tillering', preferences, pStatus, locationRec);
+            
+            if (pFertilizer && pFertilizer.method === 'gromor') {
+                const gromorKgs = convertP2O5ToGromorDirect(stage2P, pFertilizer.product, pStatus, locationRec);
+                const nutrients = getNutrientsFromGromor(gromorKgs, pFertilizer.product);
+                const rounded = roundToBag(gromorKgs);
+                
+                // Calculate actual nutrients from rounded quantity
+                const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                const fertilizerObj = {
+                    name: `Gromor ${pFertilizer.product}`,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p, // CRITICAL: Use actual P from rounded quantity, not required
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: topN, p: stage2P, k: topK };
+                const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                
+                if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination5-stage2-P')) {
+                    // Adjust remaining N and K after P fertilizer
+                    remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    remainingK = Math.max(0, topK - (stage2DeliveredK + actualNutrients.k));
+                } else {
+                    console.error(`[Combination5] Failed to add P fertilizer to Tillering - constraint violation!`);
+                }
+            }
+        }
+        
+        // STEP 2: THEN fulfill remaining N requirement with Urea (or other N fertilizer)
+        if (remainingN > 0) {
+            const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                // CRITICAL: Cap N addition to respect stage limit
+                const maxAllowedN = topN - stage2DeliveredN;
+                const nToAdd = Math.min(remainingN, maxAllowedN > 0 ? maxAllowedN : 0);
+                
+                if (nToAdd > 0) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination5-stage2-N')) {
+                        remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    }
+                }
+            }
+        }
+        
+        // STEP 3: Add K fertilizer if needed - BUT K NOT ALLOWED IN TILLERING (stageIndex === 1)
+        // CRITICAL: K must be 0 in Tillering stage - skip K addition
+        // Only add K if remainingK is significant (> 0.5 kg) to avoid excessive rounding
+        if (remainingK > 0.5) {
+            // CRITICAL FIX: Stage 2 is Tillering (index 1) - K not allowed
+            const stage2Index = 1; // Tillering stage
+            if (stage2Index === 1) {
+                const comboName = 'Combination';
+                console.warn(`[${comboName}] Stage 2 (Tillering): K remaining=${remainingK.toFixed(2)} but K not allowed in Tillering - skipping K addition`);
+                // Do not add K fertilizer in Tillering stage
+            } else {
+                const kFertilizer = selectKFertilizer(remainingK, preferences, sStatus, phStatus);
+                if (kFertilizer) {
+                    const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+                    // Use roundToBag (rounds to nearest) instead of roundToBagUp to minimize excess
+                    const rounded = roundToBag(kKgs);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: kFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n || 0,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k
+                    };
+                    
+                    // Calculate delivered nutrients so far in stage2
+                    let stage2DeliveredN = 0;
+                    let stage2DeliveredP = 0;
+                    let stage2DeliveredK = 0;
+                    stage2.fertilizers.forEach(fert => {
+                        stage2DeliveredN += fert.nContributed || 0;
+                        stage2DeliveredP += fert.pContributed || 0;
+                        stage2DeliveredK += fert.kContributed || 0;
+                    });
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    // Use safeAddFertilizer to enforce constraints
+                    const comboName = 'combination';
+                    safeAddFertilizer(stage2, fertilizerObj, stage2Index, stageTargets, deliveredBefore, `${comboName}-stage2-K`);
+                }
+            }
+        }
+        
+        // CRITICAL: Validate Stage 2 against original targets
+        let stage2FinalN = 0;
+        let stage2FinalP = 0;
+        let stage2FinalK = 0;
+        stage2.fertilizers.forEach(fert => {
+            stage2FinalN += fert.nContributed || 0;
+            stage2FinalP += fert.pContributed || 0;
+            stage2FinalK += fert.kContributed || 0;
+        });
+        
+        const stage2NCap = topN * 1.12; // 12% tolerance
+        const stage2PCap = stage2P * 1.12;
+        const stage2KCap = topK * 1.12;
+        
+        if (stage2FinalN > stage2NCap) {
+            console.error(`[Combination5] Stage 2 (Tillering) N OVERFLOW: ${stage2FinalN.toFixed(2)} > ${stage2NCap.toFixed(2)} (target: ${topN.toFixed(2)})`);
+        }
+        if (stage2FinalP > stage2PCap) {
+            console.error(`[Combination5] Stage 2 (Tillering) P OVERFLOW: ${stage2FinalP.toFixed(2)} > ${stage2PCap.toFixed(2)} (target: ${stage2P.toFixed(2)})`);
+        }
+        if (stage2FinalK > 0.01) {
+            console.error(`[Combination5] Stage 2 (Tillering) K VIOLATION: ${stage2FinalK.toFixed(2)} > 0 (K not allowed in Tillering)`);
+        }
+        
+        // Update cumulative N, P, K after Stage 2
+        stage2.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        recommendations.push(stage2);
+    }
+    
+    // Additional stages - USE ORIGINAL STAGE TARGETS (no rebalancing)
+    for (let i = 2; i < nPerSplit.length; i++) {
+        // STRICT: Use original stage targets (no rebalancing to compensate for earlier deficits)
+        const stageN = nPerSplit[i] || 0; // Original N target (1/3 rule)
+        const stageP = pPerSplit[i] || 0; // Original P split (0 for Panicle)
+        const stageK = kPerSplit[i] || 0; // Original K split (50% for Panicle)
+        
+        if (stageN <= 0 && stageK <= 0 && stageP <= 0) continue;
+        
+        const stage = {
+            stage: cropData.splits.n.stages[i] || `Stage ${i + 1}`,
+            fertilizers: []
+        };
+        
+        let deliveredN = 0;
+        let deliveredP = 0;
+        let deliveredK = 0;
+        
+        // Select N fertilizer based on S and pH status - USE safeAddFertilizer
+        if (stageN > 0) {
+            const nFertilizer = selectNFertilizer(stageN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                const nKgs = convertNToStraight(stageN, nFertilizer.toLowerCase());
+                // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                
+                const fertilizerObj = {
+                    name: nFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: stageN, p: stageP, k: stageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination5-stage3+-N')) {
+                    deliveredN += actualNutrients.n;
+                }
+            }
+        }
+        
+        // Select K fertilizer based on S and pH status - USE safeAddFertilizer
+        if (stageK > 0) {
+            const kFertilizer = selectKFertilizer(stageK, preferences, sStatus, phStatus);
+            if (kFertilizer) {
+                const kKgs = convertK2OToStraight(stageK, kFertilizer.toLowerCase());
+                const rounded = roundToBagUp(kKgs, 50);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                
+                const fertilizerObj = {
+                    name: kFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n || 0,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k
+                };
+                
+                const stageTargets = { n: stageN, p: stageP, k: stageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination5-stage3+-K')) {
+                    deliveredK += actualNutrients.k;
+                }
+            }
+        }
+        
+        // Update cumulative N, P, K after each stage
+        stage.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        if (stage.fertilizers.length > 0) {
+            recommendations.push(stage);
+        }
+    }
+    
+    // FINAL REBALANCING: If total N, P, K are still below minimum, add to appropriate stage
+    // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+    const minRequiredN = totalNRequired * 0.88; // 12% tolerance
+    const minRequiredP = totalPRequired * 0.88;
+    const minRequiredK = totalKRequired * 0.88;
+    
+    if (recommendations.length > 0) {
+        // For Paddy: P should be at Stage 2 (tillering), not Stage 3
+        // Find Stage 2 (index 1) if it exists, otherwise use last stage
+        const stage2Index = recommendations.findIndex(s => s.stage && s.stage.toLowerCase().includes('tillering'));
+        const pStage = stage2Index >= 0 ? recommendations[stage2Index] : recommendations[recommendations.length - 1];
+        const lastStage = recommendations[recommendations.length - 1];
+        
+        // Add N deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeN < minRequiredN) {
+            const deficit = totalNRequired - cumulativeN; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // Calculate already delivered nutrients in lastStage
+            let lastStageDeliveredN = 0;
+            let lastStageDeliveredP = 0;
+            let lastStageDeliveredK = 0;
+            lastStage.fertilizers.forEach(fert => {
+                lastStageDeliveredN += fert.nContributed || 0;
+                lastStageDeliveredP += fert.pContributed || 0;
+                lastStageDeliveredK += fert.kContributed || 0;
+            });
+            
+            // Check if we can add N without exceeding stage limit
+            const maxAllowedN = originalStageN - lastStageDeliveredN;
+            const nToAdd = Math.min(deficit, maxAllowedN > 0 ? maxAllowedN : 0);
+            
+            if (nToAdd > 0) {
+                // Try to get N fertilizer, but if preferences reject all, use Urea anyway (mandatory)
+                let nFertilizer = selectNFertilizer(nToAdd, preferences, sStatus, phStatus);
+                if (!nFertilizer) {
+                    // Fallback: Use Urea if all others are rejected (mandatory to meet minimum)
+                    nFertilizer = 'Urea';
+                }
+                if (nFertilizer) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL: Always round UP to ensure we meet minimum (never round down)
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                    const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                    
+                    if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-N')) {
+                        cumulativeN += actualNutrients.n;
+                    }
+                }
+            }
+        }
+        
+        // Add P deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+        if (cumulativeP < minRequiredP) {
+            const deficit = totalPRequired - cumulativeP; // Use full requirement, not just 88%
+            
+            // Determine which stage is pStage (should be Stage 2/Tillering for Paddy)
+            const pStageIndex = stage2Index >= 0 ? 1 : recommendations.length - 1;
+            const originalStageN = nPerSplit[pStageIndex] || 0;
+            const originalStageP = pPerSplit[pStageIndex] || 0;
+            const originalStageK = kPerSplit[pStageIndex] || 0;
+            
+            // CRITICAL: P not allowed in Panicle (stageIndex === 2)
+            if (pStageIndex === 2) {
+                console.warn(`[Combination5 Final Rebalancing] Cannot add P to pStage (${pStage.stage}) - P not allowed in Panicle stage`);
+            } else {
+                // Calculate already delivered nutrients in pStage
+                let pStageDeliveredN = 0;
+                let pStageDeliveredP = 0;
+                let pStageDeliveredK = 0;
+                pStage.fertilizers.forEach(fert => {
+                    pStageDeliveredN += fert.nContributed || 0;
+                    pStageDeliveredP += fert.pContributed || 0;
+                    pStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add P without exceeding stage limit
+                const maxAllowedP = originalStageP - pStageDeliveredP;
+                const pToAdd = Math.min(deficit, maxAllowedP > 0 ? maxAllowedP : 0);
+                
+                if (pToAdd > 0) {
+                    // Try to add P through appropriate fertilizer
+                    let pFertilizer = selectP2O5Fertilizer(pToAdd, 'Final', preferences, pStatus, locationRec);
+                    // If no Gromor product available or rejected, use SSP as fallback (MANDATORY to meet minimum)
+                    if (!pFertilizer || (pFertilizer.method === 'gromor' && checkPreference(pFertilizer.product, preferences) === 'Reject')) {
+                        // MANDATORY: Use SSP even if rejected - meeting minimum is required
+                        pFertilizer = { product: 'SSP', method: 'straight' };
+                    }
+                    
+                    // Always add P fertilizer (mandatory to meet minimum)
+                    // CRITICAL: Add to Stage 2 (tillering) for Paddy, not Stage 3
+                    if (pFertilizer) {
+                        if (pFertilizer && pFertilizer.method === 'gromor') {
+                            const gromorKgs = convertP2O5ToGromorDirect(pToAdd, pFertilizer.product, pStatus, locationRec);
+                            const rounded = roundToBagUp(gromorKgs, 50); // Round UP to ensure minimum
+                            const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                            
+                            const fertilizerObj = {
+                                name: `Gromor ${pFertilizer.product}`,
+                                kgs: rounded.kgs,
+                                ...rounded,
+                                nContributed: actualNutrients.n,
+                                pContributed: actualNutrients.p,
+                                kContributed: actualNutrients.k || 0
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P')) {
+                                cumulativeP += actualNutrients.p;
+                            }
+                        } else if (pFertilizer.method === 'straight' && pFertilizer.product === 'SSP') {
+                            // SSP: 16% P, 12% S
+                            const sspKgs = (pToAdd / 16) * 100;
+                            const rounded = roundToBagUp(sspKgs, 50); // Round UP to ensure minimum
+                            const actualP = (rounded.kgs * 16) / 100;
+                            const actualS = (rounded.kgs * 12) / 100;
+                            
+                            const fertilizerObj = {
+                                name: 'SSP',
+                                kgs: rounded.kgs,
+                                bags: rounded.kgs / 45,
+                                fullBags: Math.floor(rounded.kgs / 45),
+                                remainder: rounded.kgs % 45,
+                                nContributed: 0,
+                                pContributed: actualP,
+                                kContributed: 0,
+                                sContributed: actualS
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P-SSP')) {
+                                cumulativeP += actualP;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Add K deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeK < minRequiredK) {
+            const deficit = totalKRequired - cumulativeK; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // CRITICAL: K not allowed in Tillering (stageIndex === 1)
+            if (lastStageIndex === 1) {
+                console.warn(`[Combination5 Final Rebalancing] Cannot add K to lastStage (${lastStage.stage}) - K not allowed in Tillering stage`);
+            } else {
+                // Calculate already delivered nutrients in lastStage
+                let lastStageDeliveredN = 0;
+                let lastStageDeliveredP = 0;
+                let lastStageDeliveredK = 0;
+                lastStage.fertilizers.forEach(fert => {
+                    lastStageDeliveredN += fert.nContributed || 0;
+                    lastStageDeliveredP += fert.pContributed || 0;
+                    lastStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add K without exceeding stage limit
+                const maxAllowedK = originalStageK - lastStageDeliveredK;
+                const kToAdd = Math.min(deficit, maxAllowedK > 0 ? maxAllowedK : 0);
+                
+                if (kToAdd > 0) {
+                    let kFertilizer = selectKFertilizer(kToAdd, preferences, sStatus, phStatus);
+                    // Fallback: Use MOP if all others are rejected (mandatory to meet minimum)
+                    if (!kFertilizer) {
+                        kFertilizer = 'MOP';
+                    }
+                    if (kFertilizer) {
+                        const kKgs = convertK2OToStraight(kToAdd, kFertilizer.toLowerCase());
+                        const rounded = roundToBagUp(kKgs, 50);
+                        const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                        
+                        const fertilizerObj = {
+                            name: kFertilizer,
+                            kgs: rounded.kgs,
+                            ...rounded,
+                            nContributed: actualNutrients.n || 0,
+                            pContributed: actualNutrients.p || 0,
+                            kContributed: actualNutrients.k
+                        };
+                        
+                        const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                        const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                        
+                        if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-K')) {
+                            cumulativeK += actualNutrients.k;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // STAGE-SAFE TOP-UP PASS: Fill remaining headroom in each stage
+    applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, 'combination5');
+    
+    return recommendations;
+}
+
+// Calculate recommendations for Combination 6: 14-35-14 + 16-20-0
+function calculateCombination6(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+    const recommendations = [];
+    
+    // Stage 1: Basal with 14-35-14
+    const basalP = pPerSplit[0] || 0; // P at basal (60% for paddy, 100% for others)
+    const basalN = nPerSplit[0];
+    const basalK = kPerSplit[0] || 0;
+    
+    const gromor143514 = convertP2O5ToGromorDirect(basalP, '14-35-14', pStatus, locationRec);
+    const rounded143514 = roundToBag(gromor143514);
+    // CRITICAL FIX: Calculate nutrients from ROUNDED quantity, not unrounded
+    const actualNutrients143514 = getNutrientsFromGromor(rounded143514.kgs, '14-35-14');
+    let remainingN = Math.max(0, basalN - actualNutrients143514.n);
+    let remainingK = Math.max(0, basalK - actualNutrients143514.k);
+    
+    const stage1 = {
+        stage: cropData.splits.n.stages[0],
+        fertilizers: []
+    };
+    
+    if (checkPreference('14-35-14', preferences) !== 'Reject' && gromor143514 > 0) {
+        const fertilizerObj = {
+            name: 'Gromor 14-35-14',
+            kgs: rounded143514.kgs,
+            ...rounded143514,
+            nContributed: actualNutrients143514.n,
+            pContributed: (rounded143514.kgs * 35) / 100, // Actual P from rounded quantity
+            kContributed: actualNutrients143514.k
+        };
+        const stageTargets = { n: basalN, p: basalP, k: basalK };
+        const deliveredBefore = { n: 0, p: 0, k: 0 }; // Initial state for first fertilizer
+        safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination6-basal-14-35-14');
+    }
+    
+    // Select N fertilizer based on S and pH status
+    if (remainingN > 0) {
+        const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+        if (nFertilizer) {
+            const nKgs = convertNToStraight(remainingN, nFertilizer.toLowerCase());
+            // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+            const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: nFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k || 0
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            if (safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination6-basal-N')) {
+                remainingN = Math.max(0, basalN - (stage1DeliveredN + actualNutrients.n));
+            }
+        }
+    }
+    
+    // Select K fertilizer based on S and pH status
+    // Only add K if remainingK is significant (> 0.5 kg) to avoid excessive rounding
+    if (remainingK > 0.5) {
+        const kFertilizer = selectKFertilizer(remainingK, preferences, sStatus, phStatus);
+        if (kFertilizer) {
+            const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+            // Use roundToBag (rounds to nearest) instead of roundToBagUp to minimize excess
+            const rounded = roundToBag(kKgs);
+            const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+            
+            // Calculate delivered nutrients so far in stage1
+            let stage1DeliveredN = 0;
+            let stage1DeliveredP = 0;
+            let stage1DeliveredK = 0;
+            stage1.fertilizers.forEach(fert => {
+                stage1DeliveredN += fert.nContributed || 0;
+                stage1DeliveredP += fert.pContributed || 0;
+                stage1DeliveredK += fert.kContributed || 0;
+            });
+            
+            const fertilizerObj = {
+                name: kFertilizer,
+                kgs: rounded.kgs,
+                ...rounded,
+                nContributed: actualNutrients.n || 0,
+                pContributed: actualNutrients.p || 0,
+                kContributed: actualNutrients.k
+            };
+            
+            const stageTargets = { n: basalN, p: basalP, k: basalK };
+            const deliveredBefore = { n: stage1DeliveredN, p: stage1DeliveredP, k: stage1DeliveredK };
+            
+            safeAddFertilizer(stage1, fertilizerObj, 0, stageTargets, deliveredBefore, 'combination6-basal-K');
+        }
+    }
+    
+    // Calculate actual N, P, K delivered in Stage 1
+    let cumulativeN = 0, cumulativeP = 0, cumulativeK = 0;
+    stage1.fertilizers.forEach(fert => {
+        cumulativeN += fert.nContributed || 0;
+        cumulativeP += fert.pContributed || 0;
+        cumulativeK += fert.kContributed || 0;
+    });
+    
+    // Calculate total N, P, K required and remaining
+    const totalNRequired = nPerSplit.reduce((sum, n) => sum + n, 0);
+    const totalPRequired = pPerSplit.reduce((sum, p) => sum + p, 0);
+    const totalKRequired = kPerSplit.reduce((sum, k) => sum + k, 0);
+    const remainingNTotal = Math.max(0, totalNRequired - cumulativeN);
+    const remainingPTotal = Math.max(0, totalPRequired - cumulativeP);
+    const remainingKTotal = Math.max(0, totalKRequired - cumulativeK);
+    const remainingStages = nPerSplit.length - 1;
+    
+    recommendations.push(stage1);
+    
+    // Stage 2: First Top - USE ORIGINAL STAGE TARGETS (not adjusted/remaining)
+    // EXCEPTION 2: P calculated first because P fertilizers contain N, K, and S
+    if (nPerSplit.length > 1) {
+        // CRITICAL FIX: Use ORIGINAL stage targets, NOT adjusted/remaining values
+        // Stage targets are PRIMARY - we must solve each stage against its original quota
+        const originalStage2N = nPerSplit[1] || 0;
+        const originalStage2P = pPerSplit[1] || 0;
+        const originalStage2K = kPerSplit[1] || 0;
+        
+        const topN = originalStage2N;
+        const topK = originalStage2K;
+        const stage2P = originalStage2P;
+        
+        const stage2 = {
+            stage: cropData.splits.n.stages[1],
+            fertilizers: []
+        };
+        
+        let remainingN = topN;
+        let remainingK = topK;
+        
+        // STEP 1: FIRST fulfill P requirement (if any)
+        // EXCEPTION 4 & 6: Use low P fertilizers (20-20-0-13, 16-20-0-13, 28-28-0) at stage 2
+        // SSP should NOT be used at stage 2 (powder form, difficult to apply at 30 days)
+        if (stage2P > 0) {
+            const pFertilizer = selectP2O5Fertilizer(stage2P, 'at Tillering', preferences, pStatus, locationRec);
+            
+            if (pFertilizer && pFertilizer.method === 'gromor') {
+                const gromorKgs = convertP2O5ToGromorDirect(stage2P, pFertilizer.product, pStatus, locationRec);
+                const nutrients = getNutrientsFromGromor(gromorKgs, pFertilizer.product);
+                const rounded = roundToBag(gromorKgs);
+                
+                // Calculate actual nutrients from rounded quantity
+                const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                const fertilizerObj = {
+                    name: `Gromor ${pFertilizer.product}`,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p, // CRITICAL: Use actual P from rounded quantity, not required
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: topN, p: stage2P, k: topK };
+                const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                
+                if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination6-stage2-P')) {
+                    // Adjust remaining N and K after P fertilizer
+                    remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    remainingK = Math.max(0, topK - (stage2DeliveredK + actualNutrients.k));
+                } else {
+                    console.error(`[Combination2] Failed to add P fertilizer to Tillering - constraint violation!`);
+                }
+            }
+        }
+        
+        // STEP 2: THEN fulfill remaining N requirement with Urea (or other N fertilizer)
+        if (remainingN > 0) {
+            const nFertilizer = selectNFertilizer(remainingN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                // Calculate delivered nutrients so far in stage2
+                let stage2DeliveredN = 0;
+                let stage2DeliveredP = 0;
+                let stage2DeliveredK = 0;
+                stage2.fertilizers.forEach(fert => {
+                    stage2DeliveredN += fert.nContributed || 0;
+                    stage2DeliveredP += fert.pContributed || 0;
+                    stage2DeliveredK += fert.kContributed || 0;
+                });
+                
+                // CRITICAL: Cap N addition to respect stage limit
+                const maxAllowedN = topN - stage2DeliveredN;
+                const nToAdd = Math.min(remainingN, maxAllowedN > 0 ? maxAllowedN : 0);
+                
+                if (nToAdd > 0) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    if (safeAddFertilizer(stage2, fertilizerObj, 1, stageTargets, deliveredBefore, 'combination2-stage2-N')) {
+                        remainingN = Math.max(0, topN - (stage2DeliveredN + actualNutrients.n));
+                    }
+                }
+            }
+        }
+        
+        // STEP 3: Add K fertilizer if needed - BUT K NOT ALLOWED IN TILLERING (stageIndex === 1)
+        // CRITICAL: K must be 0 in Tillering stage - skip K addition
+        // Only add K if remainingK is significant (> 0.5 kg) to avoid excessive rounding
+        if (remainingK > 0.5) {
+            // CRITICAL FIX: Stage 2 is Tillering (index 1) - K not allowed
+            const stage2Index = 1; // Tillering stage
+            if (stage2Index === 1) {
+                const comboName = 'Combination';
+                console.warn(`[${comboName}] Stage 2 (Tillering): K remaining=${remainingK.toFixed(2)} but K not allowed in Tillering - skipping K addition`);
+                // Do not add K fertilizer in Tillering stage
+            } else {
+                const kFertilizer = selectKFertilizer(remainingK, preferences, sStatus, phStatus);
+                if (kFertilizer) {
+                    const kKgs = convertK2OToStraight(remainingK, kFertilizer.toLowerCase());
+                    // Use roundToBag (rounds to nearest) instead of roundToBagUp to minimize excess
+                    const rounded = roundToBag(kKgs);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: kFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n || 0,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k
+                    };
+                    
+                    // Calculate delivered nutrients so far in stage2
+                    let stage2DeliveredN = 0;
+                    let stage2DeliveredP = 0;
+                    let stage2DeliveredK = 0;
+                    stage2.fertilizers.forEach(fert => {
+                        stage2DeliveredN += fert.nContributed || 0;
+                        stage2DeliveredP += fert.pContributed || 0;
+                        stage2DeliveredK += fert.kContributed || 0;
+                    });
+                    
+                    const stageTargets = { n: topN, p: stage2P, k: topK };
+                    const deliveredBefore = { n: stage2DeliveredN, p: stage2DeliveredP, k: stage2DeliveredK };
+                    
+                    // Use safeAddFertilizer to enforce constraints
+                    const comboName = 'combination';
+                    safeAddFertilizer(stage2, fertilizerObj, stage2Index, stageTargets, deliveredBefore, `${comboName}-stage2-K`);
+                }
+            }
+        }
+        
+        // CRITICAL: Validate Stage 2 against original targets
+        let stage2FinalN = 0;
+        let stage2FinalP = 0;
+        let stage2FinalK = 0;
+        stage2.fertilizers.forEach(fert => {
+            stage2FinalN += fert.nContributed || 0;
+            stage2FinalP += fert.pContributed || 0;
+            stage2FinalK += fert.kContributed || 0;
+        });
+        
+        const stage2NCap = topN * 1.12; // 12% tolerance
+        const stage2PCap = stage2P * 1.12;
+        const stage2KCap = topK * 1.12;
+        
+        if (stage2FinalN > stage2NCap) {
+            console.error(`[Combination2] Stage 2 (Tillering) N OVERFLOW: ${stage2FinalN.toFixed(2)} > ${stage2NCap.toFixed(2)} (target: ${topN.toFixed(2)})`);
+        }
+        if (stage2FinalP > stage2PCap) {
+            console.error(`[Combination2] Stage 2 (Tillering) P OVERFLOW: ${stage2FinalP.toFixed(2)} > ${stage2PCap.toFixed(2)} (target: ${stage2P.toFixed(2)})`);
+        }
+        if (stage2FinalK > 0.01) {
+            console.error(`[Combination2] Stage 2 (Tillering) K VIOLATION: ${stage2FinalK.toFixed(2)} > 0 (K not allowed in Tillering)`);
+        }
+        
+        // Update cumulative N, P, K after Stage 2
+        stage2.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        recommendations.push(stage2);
+    }
+    
+    // Additional stages - USE ORIGINAL STAGE TARGETS (no rebalancing)
+    for (let i = 2; i < nPerSplit.length; i++) {
+        // STRICT: Use original stage targets (no rebalancing to compensate for earlier deficits)
+        const stageN = nPerSplit[i] || 0; // Original N target (1/3 rule)
+        const stageP = pPerSplit[i] || 0; // Original P split (0 for Panicle)
+        const stageK = kPerSplit[i] || 0; // Original K split (50% for Panicle)
+        
+        if (stageN <= 0 && stageK <= 0 && stageP <= 0) continue;
+        
+        const stage = {
+            stage: cropData.splits.n.stages[i] || `Stage ${i + 1}`,
+            fertilizers: []
+        };
+        
+        let deliveredN = 0;
+        let deliveredP = 0;
+        let deliveredK = 0;
+        
+        // Select N fertilizer based on S and pH status - USE safeAddFertilizer
+        if (stageN > 0) {
+            const nFertilizer = selectNFertilizer(stageN, preferences, sStatus, phStatus);
+            if (nFertilizer) {
+                const nKgs = convertNToStraight(stageN, nFertilizer.toLowerCase());
+                // CRITICAL FIX: Use roundToBagUp for N to ensure minimum requirements are met
+                const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                
+                const fertilizerObj = {
+                    name: nFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k || 0
+                };
+                
+                const stageTargets = { n: stageN, p: stageP, k: stageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination6-stage3+-N')) {
+                    deliveredN += actualNutrients.n;
+                }
+            }
+        }
+        
+        // Select K fertilizer based on S and pH status - USE safeAddFertilizer
+        if (stageK > 0.5) {
+            const kFertilizer = selectKFertilizer(stageK, preferences, sStatus, phStatus);
+            if (kFertilizer) {
+                const kKgs = convertK2OToStraight(stageK, kFertilizer.toLowerCase());
+                // Use roundToBag (rounds to nearest) instead of roundToBagUp to minimize excess
+                const rounded = roundToBag(kKgs);
+                const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                
+                const fertilizerObj = {
+                    name: kFertilizer,
+                    kgs: rounded.kgs,
+                    ...rounded,
+                    nContributed: actualNutrients.n || 0,
+                    pContributed: actualNutrients.p || 0,
+                    kContributed: actualNutrients.k
+                };
+                
+                const stageTargets = { n: stageN, p: stageP, k: stageK };
+                const deliveredBefore = { n: deliveredN, p: deliveredP, k: deliveredK };
+                
+                if (safeAddFertilizer(stage, fertilizerObj, i, stageTargets, deliveredBefore, 'combination6-stage3+-K')) {
+                    deliveredK += actualNutrients.k;
+                }
+            }
+        }
+        
+        // Update cumulative N, P, K after each stage
+        stage.fertilizers.forEach(fert => {
+            cumulativeN += fert.nContributed || 0;
+            cumulativeP += fert.pContributed || 0;
+            cumulativeK += fert.kContributed || 0;
+        });
+        
+        if (stage.fertilizers.length > 0) {
+            recommendations.push(stage);
+        }
+    }
+    
+    // FINAL REBALANCING: If total N, P, K are still below minimum, add to appropriate stage
+    // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+    const minRequiredN = totalNRequired * 0.88; // 12% tolerance
+    const minRequiredP = totalPRequired * 0.88;
+    const minRequiredK = totalKRequired * 0.88;
+    
+    if (recommendations.length > 0) {
+        // For Paddy: P should be at Stage 2 (tillering), not Stage 3
+        // Find Stage 2 (index 1) if it exists, otherwise use last stage
+        const stage2Index = recommendations.findIndex(s => s.stage && s.stage.toLowerCase().includes('tillering'));
+        const pStage = stage2Index >= 0 ? recommendations[stage2Index] : recommendations[recommendations.length - 1];
+        const lastStage = recommendations[recommendations.length - 1];
+        
+        // Add N deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeN < minRequiredN) {
+            const deficit = totalNRequired - cumulativeN; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // Calculate already delivered nutrients in lastStage
+            let lastStageDeliveredN = 0;
+            let lastStageDeliveredP = 0;
+            let lastStageDeliveredK = 0;
+            lastStage.fertilizers.forEach(fert => {
+                lastStageDeliveredN += fert.nContributed || 0;
+                lastStageDeliveredP += fert.pContributed || 0;
+                lastStageDeliveredK += fert.kContributed || 0;
+            });
+            
+            // Check if we can add N without exceeding stage limit
+            const maxAllowedN = originalStageN - lastStageDeliveredN;
+            const nToAdd = Math.min(deficit, maxAllowedN > 0 ? maxAllowedN : 0);
+            
+            if (nToAdd > 0) {
+                // Try to get N fertilizer, but if preferences reject all, use Urea anyway (mandatory)
+                let nFertilizer = selectNFertilizer(nToAdd, preferences, sStatus, phStatus);
+                if (!nFertilizer) {
+                    // Fallback: Use Urea if all others are rejected (mandatory to meet minimum)
+                    nFertilizer = 'Urea';
+                }
+                if (nFertilizer) {
+                    const nKgs = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
+                    // CRITICAL: Always round UP to ensure we meet minimum (never round down)
+                    const rounded = roundToBagUp(nKgs, nFertilizer && nFertilizer.toLowerCase() === 'urea' ? 45 : 50);
+                    const actualNutrients = getNutrientsFromStraight(rounded.kgs, nFertilizer);
+                    
+                    const fertilizerObj = {
+                        name: nFertilizer,
+                        kgs: rounded.kgs,
+                        ...rounded,
+                        nContributed: actualNutrients.n,
+                        pContributed: actualNutrients.p || 0,
+                        kContributed: actualNutrients.k || 0
+                    };
+                    
+                    const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                    const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                    
+                    if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-N')) {
+                        cumulativeN += actualNutrients.n;
+                    }
+                }
+            }
+        }
+        
+        // Add P deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        // CRITICAL: For Paddy, P should be added to Stage 2 (tillering), not Stage 3
+        if (cumulativeP < minRequiredP) {
+            const deficit = totalPRequired - cumulativeP; // Use full requirement, not just 88%
+            
+            // Determine which stage is pStage (should be Stage 2/Tillering for Paddy)
+            const pStageIndex = stage2Index >= 0 ? 1 : recommendations.length - 1;
+            const originalStageN = nPerSplit[pStageIndex] || 0;
+            const originalStageP = pPerSplit[pStageIndex] || 0;
+            const originalStageK = kPerSplit[pStageIndex] || 0;
+            
+            // CRITICAL: P not allowed in Panicle (stageIndex === 2)
+            if (pStageIndex === 2) {
+                console.warn(`[Combination6 Final Rebalancing] Cannot add P to pStage (${pStage.stage}) - P not allowed in Panicle stage`);
+            } else {
+                // Calculate already delivered nutrients in pStage
+                let pStageDeliveredN = 0;
+                let pStageDeliveredP = 0;
+                let pStageDeliveredK = 0;
+                pStage.fertilizers.forEach(fert => {
+                    pStageDeliveredN += fert.nContributed || 0;
+                    pStageDeliveredP += fert.pContributed || 0;
+                    pStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add P without exceeding stage limit
+                const maxAllowedP = originalStageP - pStageDeliveredP;
+                const pToAdd = Math.min(deficit, maxAllowedP > 0 ? maxAllowedP : 0);
+                
+                if (pToAdd > 0) {
+                    // Try to add P through appropriate fertilizer
+                    let pFertilizer = selectP2O5Fertilizer(pToAdd, 'Final', preferences, pStatus, locationRec);
+                    // If no Gromor product available or rejected, use SSP as fallback (MANDATORY to meet minimum)
+                    if (!pFertilizer || (pFertilizer.method === 'gromor' && checkPreference(pFertilizer.product, preferences) === 'Reject')) {
+                        // MANDATORY: Use SSP even if rejected - meeting minimum is required
+                        pFertilizer = { product: 'SSP', method: 'straight' };
+                    }
+                    
+                    // Always add P fertilizer (mandatory to meet minimum)
+                    // CRITICAL: Add to Stage 2 (tillering) for Paddy, not Stage 3
+                    if (pFertilizer) {
+                        if (pFertilizer && pFertilizer.method === 'gromor') {
+                            const gromorKgs = convertP2O5ToGromorDirect(pToAdd, pFertilizer.product, pStatus, locationRec);
+                            const rounded = roundToBagUp(gromorKgs, 50); // Round UP to ensure minimum
+                            const actualNutrients = getNutrientsFromGromor(rounded.kgs, pFertilizer.product);
+                            
+                            const fertilizerObj = {
+                                name: `Gromor ${pFertilizer.product}`,
+                                kgs: rounded.kgs,
+                                ...rounded,
+                                nContributed: actualNutrients.n,
+                                pContributed: actualNutrients.p,
+                                kContributed: actualNutrients.k || 0
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P')) {
+                                cumulativeP += actualNutrients.p;
+                            }
+                        } else if (pFertilizer.method === 'straight' && pFertilizer.product === 'SSP') {
+                            // SSP: 16% P, 12% S
+                            const sspKgs = (pToAdd / 16) * 100;
+                            const rounded = roundToBagUp(sspKgs, 50); // Round UP to ensure minimum
+                            const actualP = (rounded.kgs * 16) / 100;
+                            const actualS = (rounded.kgs * 12) / 100;
+                            
+                            const fertilizerObj = {
+                                name: 'SSP',
+                                kgs: rounded.kgs,
+                                bags: rounded.kgs / 45,
+                                fullBags: Math.floor(rounded.kgs / 45),
+                                remainder: rounded.kgs % 45,
+                                nContributed: 0,
+                                pContributed: actualP,
+                                kContributed: 0,
+                                sContributed: actualS
+                            };
+                            
+                            const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                            const deliveredBefore = { n: pStageDeliveredN, p: pStageDeliveredP, k: pStageDeliveredK };
+                            
+                            if (safeAddFertilizer(pStage, fertilizerObj, pStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-P-SSP')) {
+                                cumulativeP += actualP;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Add K deficit if needed - BUT CHECK STAGE CONSTRAINTS FIRST
+        // Target full requirement (not just 88%) to account for rounding down
+        if (cumulativeK < minRequiredK) {
+            const deficit = totalKRequired - cumulativeK; // Use full requirement, not just 88%
+            
+            // Determine which stage is lastStage and get its original targets
+            const lastStageIndex = recommendations.length - 1;
+            const originalStageN = nPerSplit[lastStageIndex] || 0;
+            const originalStageP = pPerSplit[lastStageIndex] || 0;
+            const originalStageK = kPerSplit[lastStageIndex] || 0;
+            
+            // CRITICAL: K not allowed in Tillering (stageIndex === 1)
+            if (lastStageIndex === 1) {
+                console.warn(`[Combination6 Final Rebalancing] Cannot add K to lastStage (${lastStage.stage}) - K not allowed in Tillering stage`);
+            } else {
+                // Calculate already delivered nutrients in lastStage
+                let lastStageDeliveredN = 0;
+                let lastStageDeliveredP = 0;
+                let lastStageDeliveredK = 0;
+                lastStage.fertilizers.forEach(fert => {
+                    lastStageDeliveredN += fert.nContributed || 0;
+                    lastStageDeliveredP += fert.pContributed || 0;
+                    lastStageDeliveredK += fert.kContributed || 0;
+                });
+                
+                // Check if we can add K without exceeding stage limit
+                const maxAllowedK = originalStageK - lastStageDeliveredK;
+                const kToAdd = Math.min(deficit, maxAllowedK > 0 ? maxAllowedK : 0);
+                
+                if (kToAdd > 0) {
+                    let kFertilizer = selectKFertilizer(kToAdd, preferences, sStatus, phStatus);
+                    // Fallback: Use MOP if all others are rejected (mandatory to meet minimum)
+                    if (!kFertilizer) {
+                        kFertilizer = 'MOP';
+                    }
+                    if (kFertilizer) {
+                        const kKgs = convertK2OToStraight(kToAdd, kFertilizer.toLowerCase());
+                        const rounded = roundToBagUp(kKgs, 50);
+                        const actualNutrients = getNutrientsFromStraight(rounded.kgs, kFertilizer);
+                        
+                        const fertilizerObj = {
+                            name: kFertilizer,
+                            kgs: rounded.kgs,
+                            ...rounded,
+                            nContributed: actualNutrients.n || 0,
+                            pContributed: actualNutrients.p || 0,
+                            kContributed: actualNutrients.k
+                        };
+                        
+                        const stageTargets = { n: originalStageN, p: originalStageP, k: originalStageK };
+                        const deliveredBefore = { n: lastStageDeliveredN, p: lastStageDeliveredP, k: lastStageDeliveredK };
+                        
+                        if (safeAddFertilizer(lastStage, fertilizerObj, lastStageIndex, stageTargets, deliveredBefore, 'final-rebalancing-K')) {
+                            cumulativeK += actualNutrients.k;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // STAGE-SAFE TOP-UP PASS: Fill remaining headroom in each stage
+    applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, 'combination6');
+    
+    return recommendations;
+}
+
+// Optimization function: Evaluate all combinations and select the best one
+// NEW: Now uses P-first approach for all combinations
+function optimizeCombination(cropData, nPerSplit, kPerSplit, pPerSplit, recommendedP, recommendedN, recommendedK, 
+                              pStatus, locationRec, preferences, sStatus, phStatus, location, nStatus, kStatus) {
+    // NEW REDESIGN: Use P-first complete system instead of old combination functions
+    // Use provided nStatus and kStatus, or defaults
+    const finalNStatus = nStatus || 'medium';
+    const finalKStatus = kStatus || 'medium';
+    
+    try {
+        // DEBUG: Log input parameters
+        console.log('[P-First] Starting calculation:', {
+            totalPRequired: pPerSplit.reduce((sum, p) => sum + p, 0),
+            pPerSplit: pPerSplit,
+            pStatus: pStatus,
+            nStatus: finalNStatus,
+            kStatus: finalKStatus
+        });
+        
+        // Use new P-first complete system
+        const recommendations = calculatePFirstComplete(
+            cropData, nPerSplit, kPerSplit, pPerSplit,
+            pStatus, finalNStatus, finalKStatus, preferences,
+            sStatus, phStatus, locationRec
+        );
+        
+        // DEBUG: Log recommendations structure
+        console.log('[P-First] Recommendations received:', recommendations.length, 'stages');
+        recommendations.forEach((stage, idx) => {
+            console.log(`[P-First] Stage ${idx} (${stage.stage}): ${stage.fertilizers.length} fertilizers`);
+            stage.fertilizers.forEach(fert => {
+                console.log(`  - ${fert.name}: P=${fert.pContributed || 0}, N=${fert.nContributed || 0}, K=${fert.kContributed || 0}`);
+            });
+        });
+        
+        // Calculate totals and excess
+        let totalN = 0, totalP = 0, totalK = 0;
+        recommendations.forEach(stage => {
+            stage.fertilizers.forEach(fert => {
+                totalN += fert.nContributed || 0;
+                totalP += fert.pContributed || 0;
+                totalK += fert.kContributed || 0;
+            });
+        });
+        
+        // DEBUG: Log totals
+        console.log('[P-First] Totals calculated:', { totalN, totalP, totalK, requiredN: recommendedN, requiredP: recommendedP, requiredK: recommendedK });
+        
+        const excessN = Math.max(0, totalN - recommendedN);
+        const excessP = Math.max(0, totalP - recommendedP);
+        const excessK = Math.max(0, totalK - recommendedK);
+        const deficitN = Math.max(0, recommendedN - totalN);
+        const deficitP = Math.max(0, recommendedP - totalP);
+        const deficitK = Math.max(0, recommendedK - totalK);
+        
+        const excessNPercent = recommendedN > 0 ? (excessN / recommendedN) * 100 : 0;
+        const excessPPercent = recommendedP > 0 ? (excessP / recommendedP) * 100 : 0;
+        const excessKPercent = recommendedK > 0 ? (excessK / recommendedK) * 100 : 0;
+        
+        const deficitNPercent = recommendedN > 0 ? (deficitN / recommendedN) * 100 : 0;
+        const deficitPPercent = recommendedP > 0 ? (deficitP / recommendedP) * 100 : 0;
+        const deficitKPercent = recommendedK > 0 ? (deficitK / recommendedK) * 100 : 0;
+        
+        // Check if meets minimum (88% threshold for validation)
+        const minRequiredN = recommendedN * 0.88;
+        const minRequiredP = recommendedP * 0.88;
+        const minRequiredK = recommendedK * 0.88;
+        const meetsMinimum = totalN >= minRequiredN && totalP >= minRequiredP && totalK >= minRequiredK;
+        
+        // Check overall tolerance (max 5% excess, no deficit)
+        const overallTolerance = 0.05; // 5%
+        const withinTolerance = excessNPercent <= (overallTolerance * 100) && 
+                               excessPPercent <= (overallTolerance * 100) && 
+                               excessKPercent <= (overallTolerance * 100) &&
+                               deficitNPercent === 0 && deficitPPercent === 0 && deficitKPercent === 0;
+        
+        // Calculate score (penalize deficits and excess)
+        const score = (deficitNPercent * 10.0) + (deficitPPercent * 10.0) + (deficitKPercent * 10.0) +
+                     (excessNPercent * 1.0) + (excessPPercent * 2.0) + (excessKPercent * 1.0);
+        
+        return {
+            bestCombination: 'P-First', // New system identifier
+            bestRecommendations: recommendations,
+            score: score,
+            excess: {
+                excessN: excessN,
+                excessP: excessP,
+                excessK: excessK,
+                excessNPercent: excessNPercent,
+                excessPPercent: excessPPercent,
+                excessKPercent: excessKPercent,
+                deficitN: deficitN,
+                deficitP: deficitP,
+                deficitK: deficitK,
+                deficitNPercent: deficitNPercent,
+                deficitPPercent: deficitPPercent,
+                deficitKPercent: deficitKPercent,
+                meetsMinimum: meetsMinimum,
+                withinTolerance: withinTolerance,
+                totalN: totalN,
+                totalP: totalP,
+                totalK: totalK
+            }
+        };
+    } catch (error) {
+        console.warn('Error in P-first calculation:', error);
+        // Fallback to old system if new one fails
+        return optimizeCombinationOld(cropData, nPerSplit, kPerSplit, pPerSplit, recommendedP, recommendedN, recommendedK, 
+                                      pStatus, locationRec, preferences, sStatus, phStatus, location);
+    }
+}
+
+// OLD Optimization function: Keep as fallback
+function optimizeCombinationOld(cropData, nPerSplit, kPerSplit, pPerSplit, recommendedP, recommendedN, recommendedK, 
+                              pStatus, locationRec, preferences, sStatus, phStatus, location) {
+    const combinations = ['1', '2', '3', '4', '5', '6'];
+    const tolerance = 0.10; // 10% tolerance for excess nutrients
+    
+    let bestScore = Infinity;
+    let bestCombination = '1';
+    let bestRecommendations = null;
+    let bestExcess = null;
+    
+    // Try each combination
+    for (const comb of combinations) {
+        let recommendations;
+        try {
+            switch (comb) {
+                case '1':
+                    recommendations = calculateCombination1(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                    break;
+                case '2':
+                    recommendations = calculateCombination2(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                    break;
+                case '3':
+                    recommendations = calculateCombination3(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                    break;
+                case '4':
+                    recommendations = calculateCombination4(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                    break;
+                case '5':
+                    recommendations = calculateCombination5(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                    break;
+                case '6':
+                    recommendations = calculateCombination6(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                    break;
+            }
+            
+            // Calculate total nutrients delivered
+            let totalN = 0, totalP = 0, totalK = 0;
+            recommendations.forEach(stage => {
+                stage.fertilizers.forEach(fert => {
+                    totalN += fert.nContributed || 0;
+                    totalP += fert.pContributed || 0;
+                    totalK += fert.kContributed || 0;
+                });
+            });
+            
+            // Calculate excess (only count over-application, not under-application)
+            const excessN = Math.max(0, totalN - recommendedN);
+            const excessP = Math.max(0, totalP - recommendedP);
+            const excessK = Math.max(0, totalK - recommendedK);
+            
+            // Calculate deficit (under-application) - heavily penalize
+            const deficitN = Math.max(0, recommendedN - totalN);
+            const deficitP = Math.max(0, recommendedP - totalP);
+            const deficitK = Math.max(0, recommendedK - totalK);
+            
+            // Calculate percentage excess
+            const excessNPercent = recommendedN > 0 ? (excessN / recommendedN) * 100 : 0;
+            const excessPPercent = recommendedP > 0 ? (excessP / recommendedP) * 100 : 0;
+            const excessKPercent = recommendedK > 0 ? (excessK / recommendedK) * 100 : 0;
+            
+            // Calculate percentage deficit (under-application)
+            const deficitNPercent = recommendedN > 0 ? (deficitN / recommendedN) * 100 : 0;
+            const deficitPPercent = recommendedP > 0 ? (deficitP / recommendedP) * 100 : 0;
+            const deficitKPercent = recommendedK > 0 ? (deficitK / recommendedK) * 100 : 0;
+            
+            // Check minimum requirements (must be at least 88% of recommended, with 12% tolerance)
+            const minRequiredN = recommendedN * (1 - tolerance);
+            const minRequiredP = recommendedP * (1 - tolerance);
+            const minRequiredK = recommendedK * (1 - tolerance);
+            const meetsMinimum = totalN >= minRequiredN && totalP >= minRequiredP && totalK >= minRequiredK;
+            
+            // Check if within tolerance (all excesses <= 10%)
+            const withinTolerance = excessNPercent <= (tolerance * 100) && 
+                                   excessPPercent <= (tolerance * 100) && 
+                                   excessKPercent <= (tolerance * 100);
+            
+            // Calculate score: heavily penalize deficits, then penalize excess
+            // Deficit penalty is 10x more severe than excess penalty
+            const score = (deficitNPercent * 10.0) + (deficitPPercent * 20.0) + (deficitKPercent * 10.0) +
+                         (excessNPercent * 1.0) + (excessPPercent * 2.0) + (excessKPercent * 1.0);
+            
+            // Prefer combinations that meet minimum requirements first
+            // Then prefer combinations within tolerance, then by lowest score
+            const isBetter = meetsMinimum ? 
+                (withinTolerance ? 
+                    (bestScore === Infinity || score < bestScore || !bestExcess || bestExcess.withinTolerance === false || !bestExcess.meetsMinimum) :
+                    (bestScore === Infinity || (!bestExcess || !bestExcess.withinTolerance || !bestExcess.meetsMinimum) && score < bestScore)) :
+                (bestScore === Infinity || (!bestExcess || !bestExcess.meetsMinimum) && score < bestScore);
+            
+            if (isBetter) {
+                bestScore = score;
+                bestCombination = comb;
+                bestRecommendations = recommendations;
+                bestExcess = {
+                    excessN: excessN,
+                    excessP: excessP,
+                    excessK: excessK,
+                    excessNPercent: excessNPercent,
+                    excessPPercent: excessPPercent,
+                    excessKPercent: excessKPercent,
+                    deficitN: deficitN,
+                    deficitP: deficitP,
+                    deficitK: deficitK,
+                    deficitNPercent: deficitNPercent,
+                    deficitPPercent: deficitPPercent,
+                    deficitKPercent: deficitKPercent,
+                    meetsMinimum: meetsMinimum,
+                    withinTolerance: withinTolerance,
+                    totalN: totalN,
+                    totalP: totalP,
+                    totalK: totalK
+                };
+            }
+        } catch (error) {
+            console.warn(`Error calculating combination ${comb}:`, error);
+            // Continue with next combination
+        }
+    }
+    
+    // If no valid combination found, use combination 1 as fallback
+    if (!bestRecommendations) {
+        bestCombination = '1';
+        bestRecommendations = calculateCombination1(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+    }
+    
+    return {
+        bestCombination: bestCombination,
+        bestRecommendations: bestRecommendations,
+        score: bestScore,
+        excess: bestExcess
+    };
+}
+
+// Main calculation function - UPDATED TO USE kg/acre AND SOIL TEST STATUS
+function calculateRecommendations(formData) {
+    const crop = formData.crop;
+    const organicCarbon = parseFloat(formData.organicCarbon);
+    const nitrogen = formData.nitrogen !== null && formData.nitrogen !== undefined && formData.nitrogen !== '' 
+        ? parseFloat(formData.nitrogen) : null; // Already in kg/acre, null if not provided
+    const phosphorus = parseFloat(formData.phosphorus); // Already in kg/acre (P2O5)
+    const potassium = parseFloat(formData.potassium); // Already in kg/acre (K2O)
+    const season = formData.season || 'Rabi';
+    const fieldType = formData.fieldType || 'Irrigated';
+    const location = formData.location;
+    const sulfur = parseFloat(formData.sulfur) || 0;
+    const ph = parseFloat(formData.ph) || 0;
+    const gromorCombination = formData.gromorCombination;
+    
+    // Additional parameters
+    const soilType = formData.soilType || '';
+    const ec = parseFloat(formData.ec) || 0;
+    const calcium = parseFloat(formData.calcium) || 0;
+    const magnesium = parseFloat(formData.magnesium) || 0;
+    const zinc = parseFloat(formData.zinc) || 0;
+    const boron = parseFloat(formData.boron) || 0;
+    const manganese = parseFloat(formData.manganese) || 0;
+    const iron = parseFloat(formData.iron) || 0;
+    const copper = parseFloat(formData.copper) || 0;
+    const molybdenum = parseFloat(formData.molybdenum) || 0;
+    const chlorine = parseFloat(formData.chlorine) || 0;
+    
+    // Step 1: Classify soil test status
+    // Nitrogen: Prefer nitrogen value if available, otherwise use organic carbon
+    const nStatus = classifyNitrogenByOC(organicCarbon, nitrogen);
+    const pStatus = classifyPhosphorus(phosphorus);
+    const kStatus = classifyPotassium(potassium);
+    const sStatus = classifySulfur(sulfur);
+    const phStatus = classifyPh(ph);
+    const ecStatus = classifyEC(ec);
+    const caStatus = classifyCalcium(calcium);
+    const mgStatus = classifyMagnesium(magnesium);
+    const znStatus = classifyZinc(zinc);
+    const bStatus = classifyBoron(boron);
+    const mnStatus = classifyManganese(manganese);
+    const feStatus = classifyIron(iron);
+    const cuStatus = classifyCopper(copper);
+    const moStatus = classifyMolybdenum(molybdenum);
+    const clStatus = classifyChlorine(chlorine);
+    
+    // Step 2: Get location-based recommendations (MANDATORY)
+    const locationRec = getLocationBasedRecommendation(
+        crop, season, location, fieldType, nStatus, pStatus, kStatus
+    );
+    
+    // MANDATORY: Location-based recommendations must be found
+    if (!locationRec) {
+        const cropKey = getCropKey(crop, season);
+        throw new Error(`MANDATORY: Location-based recommendation data not found for: ${crop} (${season}) in location: ${location}. Please ensure location-crop-recommendations data exists for "${cropKey}" and location "${location}".`);
+    }
+    
+    // Get crop data for split schedules
+    const cropData = getCropData(crop, season, fieldType);
+    if (!cropData) {
+        throw new Error(`Crop data not found for: ${crop} (${season}, ${fieldType})`);
+    }
+    
+    // Step 3: Get recommended NPK values from location-based data (MANDATORY - no fallback)
+    // Location-based recommendations are MANDATORY and must be used
+    const recommendedN = locationRec.n;
+    const recommendedP = locationRec.p;
+    const recommendedK = locationRec.k;
+    
+    // VALIDATION: Ensure recommendations are valid numbers
+    if (isNaN(recommendedN) || isNaN(recommendedP) || isNaN(recommendedK)) {
+        throw new Error(`MANDATORY VALIDATION FAILED: Invalid recommendation values. N: ${recommendedN}, P: ${recommendedP}, K: ${recommendedK}. Location: ${location}, Crop: ${crop}, Season: ${season}`);
+    }
+    
+    // VALIDATION: Ensure recommendations are positive
+    if (recommendedN < 0 || recommendedP < 0 || recommendedK < 0) {
+        throw new Error(`MANDATORY VALIDATION FAILED: Negative recommendation values detected. N: ${recommendedN}, P: ${recommendedP}, K: ${recommendedK}`);
+    }
+    
+    // Get split schedule
+    let nSplits = cropData.splits.n;
+    const kSplits = cropData.splits.k;
+    let pSplits = cropData.splits.p;
+    
+    // EXCEPTION 8: For Paddy crops (irrespective of season Kharif or Rabi), Nitrogen in 3 equal splits
+    // May vary + or - 10% based on N containing P fertiliser
+    if (crop.toLowerCase().includes('paddy') || crop === 'Paddy lowland' || crop === 'Paddy Upland' || crop === 'Paddy Mediumland') {
+        // Override N splits to be equal (1/3 each) for all paddy crops
+        if (nSplits.count === 3) {
+            nSplits = {
+                ...nSplits,
+                ratios: [1/3, 1/3, 1/3] // Equal splits: 33.33%, 33.33%, 33.33%
+            };
+        }
+    }
+    
+    // EXCEPTION 5: For Paddy crops: P split 70% stage 1, 30% stage 2 (better for root development)
+    // Otherwise 60% and 40% is also OK, but 70/30 is preferred
+    if (crop.toLowerCase().includes('paddy') || crop === 'Paddy lowland' || crop === 'Paddy Upland' || crop === 'Paddy Mediumland') {
+        if (!pSplits || !pSplits.ratios) {
+            // Default P split for paddy: 70% basal, 30% at tillering (preferred for root development)
+            pSplits = {
+                count: 2,
+                ratios: [0.7, 0.3],
+                stages: ["Basal", "at Tillering"]
+            };
+        } else if (pSplits.ratios && pSplits.ratios.length === 2) {
+            // Update existing paddy P splits to 70/30 if currently 60/40
+            if (Math.abs(pSplits.ratios[0] - 0.6) < 0.01 && Math.abs(pSplits.ratios[1] - 0.4) < 0.01) {
+                pSplits = {
+                    ...pSplits,
+                    ratios: [0.7, 0.3]
+                };
+            }
+        }
+    } else if (!pSplits) {
+        // For non-paddy crops, P is applied 100% at basal if not specified
+        pSplits = {
+            count: 1,
+            ratios: [1.0],
+            stages: ["Basal"]
+        };
+    }
+    
+    // Calculate per-split requirements
+    const nPerSplit = nSplits.ratios.map(ratio => recommendedN * ratio);
+    const pPerSplitRaw = pSplits.ratios.map(ratio => recommendedP * ratio);
+    const kPerSplitRaw = kSplits.ratios.map(ratio => recommendedK * ratio);
+    
+    // DEBUG: Log P split calculation
+    console.log('[DEBUG] P Split Calculation:', {
+        recommendedP: recommendedP,
+        pSplits: pSplits,
+        pPerSplitRaw: pPerSplitRaw,
+        nSplitsStages: nSplits.stages,
+        pSplitsStages: pSplits.stages
+    });
+    
+    // Map P splits to N stages by matching stage names
+    const pPerSplit = nSplits.stages.map((nStage, nIndex) => {
+        const pIndex = pSplits.stages.findIndex(pStage => pStage === nStage);
+        const value = pIndex >= 0 ? pPerSplitRaw[pIndex] : 0;
+        console.log(`[DEBUG] Mapping P split: Stage ${nIndex} (${nStage}) -> P index ${pIndex} -> ${value.toFixed(2)} kg`);
+        return value;
+    });
+    
+    console.log('[DEBUG] Final pPerSplit array:', pPerSplit);
+    
+    // Map K splits to N stages by matching stage names (not indices)
+    // This handles cases where K has fewer stages than N (e.g., K at Basal and Panicle, but N at Basal, Tillering, Panicle)
+    const kPerSplit = nSplits.stages.map((nStage, nIndex) => {
+        const kIndex = kSplits.stages.findIndex(kStage => kStage === nStage);
+        return kIndex >= 0 ? kPerSplitRaw[kIndex] : 0;
+    });
+    
+    // Get fertilizer preferences — use passed-in value if available (testable),
+    // otherwise read from DOM for normal browser form submissions.
+    const preferences = (formData && formData.preferences) ? { ...formData.preferences } : (() => {
+        const prefs = {};
+        const form = document.getElementById('soilTestForm');
+        if (form) {
+            form.querySelectorAll('[name^="pref_"]').forEach(input => {
+                prefs[input.name] = input.value;
+            });
+        }
+        return prefs;
+    })();
+    
+    // Optimization: Evaluate all combinations and select the best one
+    // Only optimize if combination is auto-selected or not specified
+    let combination = gromorCombination;
+    let recommendations;
+    let optimizationInfo = null; // Initialize to null
+    
+    if (!combination || combination === 'Auto-select based on Location' || combination === '') {
+        // Optimize: Try all combinations and select the best
+        optimizationInfo = optimizeCombination(
+            cropData, nPerSplit, kPerSplit, pPerSplit, recommendedP, recommendedN, recommendedK,
+            pStatus, locationRec, preferences, sStatus, phStatus, location
+        );
+        combination = optimizationInfo.bestCombination;
+        recommendations = optimizationInfo.bestRecommendations;
+    } else {
+        // Use specified combination
+        if (location && locationsData.locationPreferences) {
+            const locationPref = locationsData.locationPreferences[location];
+            if (locationPref && !combination) {
+                combination = locationPref.preferredCombination.toString();
+            }
+        }
+        combination = combination || '1';
+        
+        // Calculate based on combination
+        switch (combination) {
+            case '1':
+                recommendations = calculateCombination1(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                break;
+            case '2':
+                recommendations = calculateCombination2(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                break;
+            case '3':
+                recommendations = calculateCombination3(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                break;
+            case '4':
+                recommendations = calculateCombination4(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                break;
+            case '5':
+                recommendations = calculateCombination5(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                break;
+            case '6':
+                recommendations = calculateCombination6(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+                break;
+            default:
+                recommendations = calculateCombination1(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus);
+        }
+    }
+    
+    // Nutrient Analysis (using soil test status)
+    const nutrientAnalysis = {
+        nitrogen: {
+            value: nitrogen,
+            status: nStatus,
+            classification: nStatus
+        },
+        phosphorus: {
+            value: phosphorus,
+            status: pStatus,
+            classification: pStatus
+        },
+        potassium: {
+            value: potassium,
+            status: kStatus,
+            classification: kStatus
+        },
+        sulfur: {
+            value: sulfur,
+            status: sStatus,
+            classification: sStatus
+        },
+        ph: {
+            value: ph,
+            status: phStatus,
+            classification: phStatus
+        },
+        ec: {
+            value: ec,
+            status: ecStatus,
+            classification: ecStatus
+        },
+        calcium: {
+            value: calcium,
+            status: caStatus,
+            classification: caStatus
+        },
+        magnesium: {
+            value: magnesium,
+            status: mgStatus,
+            classification: mgStatus
+        },
+        zinc: {
+            value: zinc,
+            status: znStatus,
+            classification: znStatus
+        },
+        boron: {
+            value: boron,
+            status: bStatus,
+            classification: bStatus
+        },
+        manganese: {
+            value: manganese,
+            status: mnStatus,
+            classification: mnStatus
+        },
+        iron: {
+            value: iron,
+            status: feStatus,
+            classification: feStatus
+        },
+        copper: {
+            value: copper,
+            status: cuStatus,
+            classification: cuStatus
+        },
+        molybdenum: {
+            value: molybdenum,
+            status: moStatus,
+            classification: moStatus
+        },
+        chlorine: {
+            value: chlorine,
+            status: clStatus,
+            classification: clStatus
+        }
+    };
+    
+    // Get pH-based recommendations
+    const phRecommendations = getPhRecommendations(phStatus);
+    
+    // Get combination info
+    const combinationInfo = locationsData.combinations?.[combination] || {
+        name: `Combination ${combination}`,
+        description: 'Gromor fertilizer combination'
+    };
+    
+    // ============================================================================
+    // ENHANCEMENT: Calculation Steps Tracking (for Excel format transparency)
+    // ============================================================================
+    
+    // Get base recommendations (normal) for comparison
+    const cropKey = getCropKey(crop, season);
+    let baseRecommendation = {n: recommendedN, p: recommendedP, k: recommendedK};
+    if (locationCropRecommendations[cropKey] && locationCropRecommendations[cropKey][location]) {
+        const rec = locationCropRecommendations[cropKey][location];
+        baseRecommendation = {
+            n: rec.normal?.n || recommendedN,
+            p: rec.normal?.p || recommendedP,
+            k: rec.normal?.k || recommendedK
+        };
+    }
+    
+    // Calculate adjustments
+    const nAdjustment = recommendedN - baseRecommendation.n;
+    const pAdjustment = recommendedP - baseRecommendation.p;
+    const kAdjustment = recommendedK - baseRecommendation.k;
+    
+    // Helper function to get adjustment reason
+    function getAdjustmentReason(nutrient, status) {
+        if (status === 'low') {
+            return `${nutrient.toUpperCase()}-Low: Add ${nutrient === 'n' ? nAdjustment : nutrient === 'p' ? pAdjustment : kAdjustment} kg to base recommendation`;
+        } else if (status === 'high') {
+            return `${nutrient.toUpperCase()}-High: Subtract ${Math.abs(nutrient === 'n' ? nAdjustment : nutrient === 'p' ? pAdjustment : kAdjustment)} kg from base recommendation`;
+        } else {
+            return `${nutrient.toUpperCase()}-Medium: No adjustment (use base recommendation)`;
+        }
+    }
+    
+    // Step 1: Required Nutrients Based on Soil Test
+    const calculationSteps = {
+        step1: {
+            title: "Required Nutrients Based on Soil Test",
+            baseRecommendation: baseRecommendation,
+            adjustments: {
+                n: {
+                    value: nAdjustment,
+                    reason: getAdjustmentReason('n', nStatus)
+                },
+                p: {
+                    value: pAdjustment,
+                    reason: getAdjustmentReason('p', pStatus)
+                },
+                k: {
+                    value: kAdjustment,
+                    reason: getAdjustmentReason('k', kStatus)
+                }
+            },
+            finalRecommendation: {
+                n: recommendedN,
+                p: recommendedP,
+                k: recommendedK
+            }
+        },
+        step2: {
+            title: "Complex Fertilizer Selection",
+            selectedFertilizer: combinationInfo.name || `Combination ${combination}`,
+            quantity: null, // Will be calculated from recommendations
+            reason: `Selected based on location preference (${location}) and P status (${pStatus})`
+        },
+        step3: {
+            title: "Stage-wise Application",
+            stages: recommendations
+        }
+    };
+    
+    // ============================================================================
+    // ENHANCEMENT: Balance Tracking
+    // ============================================================================
+    function calculateBalanceTracking(recommendations, recommendedNPK) {
+        const balanceTracking = {
+            initial: {...recommendedNPK},
+            afterBasal: {...recommendedNPK},
+            afterTop1: {...recommendedNPK},
+            afterTop2: {...recommendedNPK}
+        };
+        
+        let cumulativeN = 0, cumulativeP = 0, cumulativeK = 0;
+        
+        recommendations.forEach((stage, index) => {
+            stage.fertilizers.forEach(fert => {
+                cumulativeN += fert.nContributed || 0;
+                cumulativeP += fert.pContributed || 0;
+                cumulativeK += fert.kContributed || 0;
+            });
+            
+            const balance = {
+                n: recommendedNPK.n - cumulativeN,
+                p: recommendedNPK.p - cumulativeP,
+                k: recommendedNPK.k - cumulativeK
+            };
+            
+            if (index === 0) {
+                balanceTracking.afterBasal = balance;
+            } else if (index === 1) {
+                balanceTracking.afterTop1 = balance;
+            } else if (index === 2) {
+                balanceTracking.afterTop2 = balance;
+            }
+        });
+        
+        return balanceTracking;
+    }
+    
+    const balanceTracking = calculateBalanceTracking(recommendations, {
+        n: recommendedN,
+        p: recommendedP,
+        k: recommendedK
+    });
+    
+    // ============================================================================
+    // ENHANCEMENT: Nutrient Contribution Table
+    // ============================================================================
+    function buildNutrientContributionTable(recommendations) {
+        return recommendations.map(stage => {
+            const fertilizers = stage.fertilizers.map(fert => ({
+                name: fert.name,
+                qty: fert.kgs,
+                n: fert.nContributed || 0,
+                p: fert.pContributed || 0,
+                k: fert.kContributed || 0,
+                s: fert.sContributed || 0
+            }));
+            
+            const totals = fertilizers.reduce((acc, fert) => ({
+                n: acc.n + fert.n,
+                p: acc.p + fert.p,
+                k: acc.k + fert.k,
+                s: acc.s + fert.s
+            }), {n: 0, p: 0, k: 0, s: 0});
+            
+            return {
+                stage: stage.stage,
+                fertilizers,
+                totals
+            };
+        });
+    }
+    
+    const nutrientContributionTable = buildNutrientContributionTable(recommendations);
+    
+    // ============================================================================
+    // ENHANCEMENT: Nutrient Comparison (Available vs Required)
+    // ============================================================================
+    const nutrientComparison = {
+        available: {
+            n: nitrogen || 0,
+            p: phosphorus || 0,
+            k: potassium || 0
+        },
+        required: {
+            n: recommendedN,
+            p: recommendedP,
+            k: recommendedK
+        },
+        adjustment: {
+            n: nAdjustment,
+            p: pAdjustment,
+            k: kAdjustment
+        },
+        reason: {
+            n: getAdjustmentReason('n', nStatus),
+            p: getAdjustmentReason('p', pStatus),
+            k: getAdjustmentReason('k', kStatus)
+        }
+    };
+    
+    // ============================================================================
+    // ENHANCEMENT: Remarks/Notes Generation
+    // ============================================================================
+    const remarks = [];
+    
+    // Add remarks based on adjustments
+    if (Math.abs(pAdjustment) > 0.1) {
+        const percentChange = ((pAdjustment / baseRecommendation.p) * 100).toFixed(1);
+        remarks.push(`P ${percentChange > 0 ? '+' : ''}${percentChange}% ${percentChange > 0 ? 'more' : 'less'} than base recommendation due to ${pStatus} soil P status`);
+    }
+    if (Math.abs(nAdjustment) > 0.1) {
+        const percentChange = ((nAdjustment / baseRecommendation.n) * 100).toFixed(1);
+        remarks.push(`N ${percentChange > 0 ? '+' : ''}${percentChange}% ${percentChange > 0 ? 'more' : 'less'} than base recommendation due to ${nStatus} soil N status`);
+    }
+    if (Math.abs(kAdjustment) > 0.1) {
+        const percentChange = ((kAdjustment / baseRecommendation.k) * 100).toFixed(1);
+        remarks.push(`K ${percentChange > 0 ? '+' : ''}${percentChange}% ${percentChange > 0 ? 'more' : 'less'} than base recommendation due to ${kStatus} soil K status`);
+    }
+    
+    // Add remarks for fertilizer selection
+    if (pStatus === 'low' && nStatus === 'high') {
+        remarks.push('If high P and Low N, then high phosphate containing Fert like DAP(18-46-0) or 14-35-14');
+    }
+    
+    // Calculate expected NPK per stage based on split ratios
+    const expectedNPKPerStage = [];
+    for (let i = 0; i < nPerSplit.length; i++) {
+        const nStage = nSplits.stages[i];
+        const kIndex = cropData.splits.k.stages.findIndex(kStage => kStage === nStage);
+        const kRatio = kIndex >= 0 ? cropData.splits.k.ratios[kIndex] : 0;
+        
+        // Calculate expected P per stage (60% basal, 40% tillering for paddy)
+        const pIndex = pSplits.stages.findIndex(pStage => pStage === nStage);
+        const expectedP = pIndex >= 0 ? pPerSplitRaw[pIndex] : 0;
+        
+        expectedNPKPerStage.push({
+            stage: nStage,
+            expectedN: nPerSplit[i],
+            expectedP: expectedP, // P split based on crop (60/40 for paddy, 100% basal for others)
+            expectedK: kPerSplit[i] || 0,
+            nRatio: nSplits.ratios[i], // Use the modified nSplits ratios
+            kRatio: kRatio
+        });
+    }
+    
+    // Calculate actual NPK delivered per stage from fertilizers
+    const actualNPKPerStage = recommendations.map((stage, index) => {
+        let actualN = 0, actualP = 0, actualK = 0;
+        stage.fertilizers.forEach(fert => {
+            actualN += fert.nContributed || 0;
+            actualP += fert.pContributed || 0;
+            actualK += fert.kContributed || 0;
+        });
+        return {
+            stage: stage.stage,
+            actualN: actualN,
+            actualP: actualP,
+            actualK: actualK
+        };
+    });
+    
+    // MANDATORY VALIDATION: Calculate total nutrients delivered
+    let totalDeliveredN = 0, totalDeliveredP = 0, totalDeliveredK = 0;
+    recommendations.forEach(stage => {
+        stage.fertilizers.forEach(fert => {
+            totalDeliveredN += fert.nContributed || 0;
+            totalDeliveredP += fert.pContributed || 0;
+            totalDeliveredK += fert.kContributed || 0;
+        });
+    });
+    
+    // MANDATORY VALIDATION: Ensure minimum requirements are met (allow 12% tolerance for bag rounding)
+    // Increased to 12% to account for rounding to bag sizes (45kg bags can cause small deficits)
+    const tolerance = 0.12; // 12% tolerance for rounding to bag sizes (more realistic for 45kg bags)
+    const minRequiredN = recommendedN * (1 - tolerance);
+    const minRequiredP = recommendedP * (1 - tolerance);
+    const minRequiredK = recommendedK * (1 - tolerance);
+    
+    const validationErrors = [];
+    if (totalDeliveredN < minRequiredN) {
+        validationErrors.push(`MANDATORY VALIDATION FAILED: Nitrogen delivery (${totalDeliveredN.toFixed(2)} kg/acre) is below minimum required (${minRequiredN.toFixed(2)} kg/acre). Required: ${recommendedN} kg/acre`);
+    }
+    if (totalDeliveredP < minRequiredP) {
+        validationErrors.push(`MANDATORY VALIDATION FAILED: Phosphorus delivery (${totalDeliveredP.toFixed(2)} kg/acre) is below minimum required (${minRequiredP.toFixed(2)} kg/acre). Required: ${recommendedP} kg/acre`);
+    }
+    if (totalDeliveredK < minRequiredK) {
+        validationErrors.push(`MANDATORY VALIDATION FAILED: Potassium delivery (${totalDeliveredK.toFixed(2)} kg/acre) is below minimum required (${minRequiredK.toFixed(2)} kg/acre). Required: ${recommendedK} kg/acre`);
+    }
+    
+    // Add validation remarks (now that validationErrors is declared)
+    if (validationErrors.length === 0) {
+        remarks.push('All nutrient requirements met within tolerance limits');
+    } else {
+        remarks.push(`Validation: ${validationErrors.length} issue(s) detected - please review recommendations`);
+    }
+    
+    // If validation fails, attach warnings but still return the recommendation
+    if (validationErrors.length > 0) {
+        const validationWarning = `Nutrient delivery shortfall detected:\n${validationErrors.join('\n')}\n` +
+                        `Delivered: N=${totalDeliveredN.toFixed(2)}, P=${totalDeliveredP.toFixed(2)}, K=${totalDeliveredK.toFixed(2)} kg/acre`;
+        remarks.push(validationWarning);
+        console.warn('[Validation] ' + validationWarning);
+    }
+    
+    return {
+        recommendations,
+        nutrientAnalysis,
+        crop,
+        season,
+        fieldType,
+        location,
+        combination: combinationInfo,
+        soilTestStatus: { nStatus, pStatus, kStatus, sStatus, phStatus, ecStatus, caStatus, mgStatus, znStatus, bStatus, mnStatus, feStatus, cuStatus, moStatus, clStatus, soilType },
+        phRecommendations: phRecommendations,
+        recommendedNPK: {
+            n: recommendedN,
+            p: recommendedP,
+            k: recommendedK
+        },
+        deliveredNPK: {
+            n: totalDeliveredN,
+            p: totalDeliveredP,
+            k: totalDeliveredK
+        },
+        validation: {
+            passed: validationErrors.length === 0,
+            errors: validationErrors,
+            tolerance: tolerance * 100
+        },
+        totals: {
+            n: recommendedN,
+            p: recommendedP,
+            k: recommendedK
+        },
+        expectedNPKPerStage: expectedNPKPerStage,
+        actualNPKPerStage: actualNPKPerStage,
+        splitRatios: {
+            n: nSplits.ratios, // Use the modified nSplits ratios (may be overridden for SOUTH TELENGANA)
+            k: cropData.splits.k.ratios,
+            nStages: nSplits.stages,
+            kStages: cropData.splits.k.stages
+        },
+        recommendedBasedOn: {
+            nStatus,
+            pStatus,
+            kStatus
+        },
+        optimizationInfo: optimizationInfo,
+        // ENHANCEMENT: New fields for Excel format transparency
+        calculationSteps: calculationSteps,
+        balanceTracking: balanceTracking,
+        nutrientContributionTable: nutrientContributionTable,
+        nutrientComparison: nutrientComparison,
+        remarks: remarks
+    };
+}
+
+// Display results
+function displayResults(results) {
+    const resultsSection = document.getElementById('resultsSection');
+    const resultsContent = document.getElementById('resultsContent');
+    
+    let html = '';
+    
+    // STEP 1: Nutrient Analysis (at the top)
+    html += `
+        <div class="recommendation-card">
+            <h3>Nutrient Analysis</h3>
+            <div class="nutrient-analysis">
+    `;
+    
+    // Define units for each nutrient
+    const nutrientUnits = {
+        nitrogen: 'kg/acre',
+        phosphorus: 'kg/acre',
+        potassium: 'kg/acre',
+        sulfur: 'ppm',
+        ph: '',
+        ec: 'dS/m',
+        calcium: 'cmol/kg',
+        magnesium: 'cmol/kg',
+        zinc: 'ppm',
+        boron: 'ppm',
+        manganese: 'ppm',
+        iron: 'ppm',
+        copper: 'ppm',
+        molybdenum: 'ppm',
+        chlorine: 'ppm'
+    };
+    
+    // Define display names
+    const nutrientNames = {
+        nitrogen: 'Nitrogen',
+        phosphorus: 'Phosphorus',
+        potassium: 'Potassium',
+        sulfur: 'Sulfur',
+        ph: 'pH',
+        ec: 'EC',
+        calcium: 'Calcium',
+        magnesium: 'Magnesium',
+        zinc: 'Zinc',
+        boron: 'Boron',
+        manganese: 'Manganese',
+        iron: 'Iron',
+        copper: 'Copper',
+        molybdenum: 'Molybdenum',
+        chlorine: 'Chlorine'
+    };
+    
+    Object.entries(results.nutrientAnalysis).forEach(([nutrient, data]) => {
+        // Skip if no value and not a special case (sulfur, ph, ec can be 0)
+        if (!data.value && data.value !== 0 && nutrient !== 'sulfur' && nutrient !== 'ph' && nutrient !== 'ec') return;
+        
+        const className = data.status || data.classification;
+        const unit = nutrientUnits[nutrient] || '';
+        const displayName = nutrientNames[nutrient] || nutrient.charAt(0).toUpperCase() + nutrient.slice(1);
+        
+        let displayValue = data.value || 'N/A';
+        if (displayValue !== 'N/A' && (nutrient === 'ph' || nutrient === 'ec')) {
+            displayValue = parseFloat(displayValue).toFixed(2);
+        } else if (displayValue !== 'N/A' && (nutrient === 'zinc' || nutrient === 'boron' || nutrient === 'copper' || nutrient === 'molybdenum')) {
+            displayValue = parseFloat(displayValue).toFixed(2);
+        } else if (displayValue !== 'N/A' && (nutrient === 'manganese' || nutrient === 'iron' || nutrient === 'chlorine')) {
+            displayValue = parseFloat(displayValue).toFixed(1);
+        } else if (displayValue !== 'N/A' && nutrient === 'ph') {
+            displayValue = parseFloat(displayValue).toFixed(1);
+        }
+        
+        let classificationText = data.status || data.classification || 'N/A';
+        if (nutrient === 'ph' && classificationText && classificationText !== 'N/A') {
+            // Format pH classification text (e.g., "stronglyAcidic" -> "Strongly Acidic")
+            classificationText = classificationText.replace(/([A-Z])/g, ' $1').trim();
+            classificationText = classificationText.charAt(0).toUpperCase() + classificationText.slice(1);
+        } else if (['calcium', 'magnesium', 'zinc', 'boron', 'manganese', 'iron', 'copper', 'molybdenum', 'chlorine'].includes(nutrient)) {
+            // For micronutrients and secondary nutrients, use Deficiency/Sufficiency
+            if (classificationText === 'low' || classificationText === 'deficiency') {
+                classificationText = 'Deficiency';
+            } else if (classificationText === 'high' || classificationText === 'sufficiency') {
+                classificationText = 'Sufficiency';
+            } else if (classificationText && classificationText !== 'N/A') {
+                classificationText = classificationText.charAt(0).toUpperCase() + classificationText.slice(1);
+            }
+        } else if (nutrient !== 'ph' && classificationText && classificationText !== 'N/A') {
+            classificationText = classificationText.toUpperCase();
+        }
+        
+        html += `
+            <div class="nutrient-item ${className}">
+                <strong>${displayName}</strong><br>
+                ${displayValue}${unit ? ' ' + unit : ''}<br>
+                <span style="text-transform: ${nutrient === 'ph' ? 'none' : 'uppercase'}; font-weight: 600;">${classificationText}</span>
+            </div>
+        `;
+    });
+    
+    html += `</div></div>`;
+    
+    // pH Recommendations (if available) - right after Nutrient Analysis
+    if (results.phRecommendations) {
+        const phRec = results.phRecommendations;
+        const priorityClass = phRec.priority === 'high' ? 'high' : phRec.priority === 'medium' ? 'medium' : 'low';
+        html += `
+        <div class="recommendation-card" style="border-left: 4px solid ${phRec.priority === 'high' ? '#e74c3c' : phRec.priority === 'medium' ? '#f39c12' : '#3498db'};">
+            <h3>${phRec.title}</h3>
+            <div class="ph-advisory" style="padding: 15px; background: ${phRec.priority === 'high' ? '#fee' : phRec.priority === 'medium' ? '#fff8e1' : '#e3f2fd'}; border-radius: 5px; margin-top: 10px;">
+                <p style="margin: 0; line-height: 1.6; color: #333;">
+                    <strong>Recommendation:</strong> ${phRec.advisory}
+                </p>
+            </div>
+        </div>
+        `;
+    }
+    
+    // STEP 2: Total Requirements (after Nutrient Analysis)
+    html += `
+        <div class="recommendation-card">
+            <h3>Total Requirements (per acre)</h3>
+            <div class="summary-stats">
+                <div class="stat-item">
+                    <div class="stat-value">${results.totals.n.toFixed(1)}</div>
+                    <div class="stat-label">N (kg/acre)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${results.totals.p.toFixed(1)}</div>
+                    <div class="stat-label">P (kg/acre)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${results.totals.k.toFixed(1)}</div>
+                    <div class="stat-label">K (kg/acre)</div>
+                </div>
+            </div>
+            
+            ${results.calculationSteps ? `
+            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
+                <h4 style="margin-top: 0; color: #2c3e50;">📊 Calculation Steps</h4>
+                <div style="margin-top: 15px;">
+                    <div style="margin-bottom: 15px;">
+                        <strong style="color: #27ae60;">Step 1: ${results.calculationSteps.step1.title}</strong>
+                        <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 3px;">
+                            <div><strong>Base Recommendation:</strong> N=${results.calculationSteps.step1.baseRecommendation.n} kg, P=${results.calculationSteps.step1.baseRecommendation.p} kg, K=${results.calculationSteps.step1.baseRecommendation.k} kg/acre</div>
+                            <div style="margin-top: 8px;"><strong>Adjustments:</strong></div>
+                            <ul style="margin: 5px 0; padding-left: 20px;">
+                                <li>N: ${results.calculationSteps.step1.adjustments.n.value > 0 ? '+' : ''}${results.calculationSteps.step1.adjustments.n.value.toFixed(1)} kg - ${results.calculationSteps.step1.adjustments.n.reason}</li>
+                                <li>P: ${results.calculationSteps.step1.adjustments.p.value > 0 ? '+' : ''}${results.calculationSteps.step1.adjustments.p.value.toFixed(1)} kg - ${results.calculationSteps.step1.adjustments.p.reason}</li>
+                                <li>K: ${results.calculationSteps.step1.adjustments.k.value > 0 ? '+' : ''}${results.calculationSteps.step1.adjustments.k.value.toFixed(1)} kg - ${results.calculationSteps.step1.adjustments.k.reason}</li>
+                            </ul>
+                            <div style="margin-top: 8px;"><strong>Final Recommendation:</strong> N=${results.calculationSteps.step1.finalRecommendation.n} kg, P=${results.calculationSteps.step1.finalRecommendation.p} kg, K=${results.calculationSteps.step1.finalRecommendation.k} kg/acre</div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong style="color: #27ae60;">Step 2: ${results.calculationSteps.step2.title}</strong>
+                        <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 3px;">
+                            <div><strong>Selected:</strong> ${results.calculationSteps.step2.selectedFertilizer}</div>
+                            <div style="margin-top: 5px;"><strong>Reason:</strong> ${results.calculationSteps.step2.reason}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
+            
+            ${results.nutrientComparison ? `
+            <div style="margin-top: 20px; padding: 15px; background: #fff8e1; border-radius: 5px; border-left: 4px solid #ff9800;">
+                <h4 style="margin-top: 0; color: #2c3e50;">📋 Available vs Required Comparison</h4>
+                <table style="width: 100%; margin-top: 10px; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f5f5f5;">
+                            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Nutrient</th>
+                            <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Available (kg/acre)</th>
+                            <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Required (kg/acre)</th>
+                            <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Adjustment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>N</strong></td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${results.nutrientComparison.available.n.toFixed(1)}</td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${results.nutrientComparison.required.n.toFixed(1)}</td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: ${results.nutrientComparison.adjustment.n > 0 ? '#27ae60' : results.nutrientComparison.adjustment.n < 0 ? '#e74c3c' : '#666'};">
+                                ${results.nutrientComparison.adjustment.n > 0 ? '+' : ''}${results.nutrientComparison.adjustment.n.toFixed(1)} kg
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>P</strong></td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${results.nutrientComparison.available.p.toFixed(1)}</td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${results.nutrientComparison.required.p.toFixed(1)}</td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: ${results.nutrientComparison.adjustment.p > 0 ? '#27ae60' : results.nutrientComparison.adjustment.p < 0 ? '#e74c3c' : '#666'};">
+                                ${results.nutrientComparison.adjustment.p > 0 ? '+' : ''}${results.nutrientComparison.adjustment.p.toFixed(1)} kg
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>K</strong></td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${results.nutrientComparison.available.k.toFixed(1)}</td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${results.nutrientComparison.required.k.toFixed(1)}</td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: ${results.nutrientComparison.adjustment.k > 0 ? '#27ae60' : results.nutrientComparison.adjustment.k < 0 ? '#e74c3c' : '#666'};">
+                                ${results.nutrientComparison.adjustment.k > 0 ? '+' : ''}${results.nutrientComparison.adjustment.k.toFixed(1)} kg
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                    <strong>Adjustment Reasons:</strong><br>
+                    • N: ${results.nutrientComparison.reason.n}<br>
+                    • P: ${results.nutrientComparison.reason.p}<br>
+                    • K: ${results.nutrientComparison.reason.k}
+                </div>
+            </div>
+            ` : ''}
+            ${results.optimizationInfo && results.optimizationInfo.excess ? `
+            <div style="margin-top: 15px; padding: 12px; background: ${results.optimizationInfo.excess.withinTolerance ? '#e8f5e9' : '#fff3e0'}; border-radius: 5px; border-left: 3px solid ${results.optimizationInfo.excess.withinTolerance ? '#4caf50' : '#ff9800'};">
+                <h4 style="margin: 0 0 10px 0; font-size: 0.95em;">Optimization Result</h4>
+                <div style="font-size: 0.85em; line-height: 1.6;">
+                    <div><strong>Total Delivered:</strong> N: ${results.optimizationInfo.excess.totalN.toFixed(1)} kg, P: ${results.optimizationInfo.excess.totalP.toFixed(1)} kg, K: ${results.optimizationInfo.excess.totalK.toFixed(1)} kg</div>
+                    <div><strong>Excess:</strong> N: ${results.optimizationInfo.excess.excessN.toFixed(1)} kg (${results.optimizationInfo.excess.excessNPercent.toFixed(1)}%), 
+                    P: ${results.optimizationInfo.excess.excessP.toFixed(1)} kg (${results.optimizationInfo.excess.excessPPercent.toFixed(1)}%), 
+                    K: ${results.optimizationInfo.excess.excessK.toFixed(1)} kg (${results.optimizationInfo.excess.excessKPercent.toFixed(1)}%)</div>
+                    <div style="margin-top: 5px; font-weight: 600; color: ${results.optimizationInfo.excess.withinTolerance ? '#2e7d32' : '#e65100'};">
+                        ${results.optimizationInfo.excess.withinTolerance ? '✓ Within 10% tolerance' : '⚠ Exceeds 10% tolerance - best available solution'}
+                    </div>
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `;
+    
+    // STEP 3: Recommendation Summary and Combination Info
+    html += `
+        <div class="recommendation-card">
+            <h3>Recommendation Summary</h3>
+            <p><strong>Crop:</strong> ${results.crop}</p>
+            <p><strong>Season:</strong> ${results.season || 'Not specified'}</p>
+            <p><strong>Field Type:</strong> ${results.fieldType || 'Not specified'}</p>
+            ${results.location ? `<p><strong>Location:</strong> ${results.location}</p>` : ''}
+        </div>
+        
+        <div class="combination-info">
+            <h4>Selected Gromor Combination</h4>
+            <p><strong>${results.combination.name}</strong></p>
+            <p>${results.combination.description}</p>
+        </div>
+        
+        <div class="recommendation-card">
+            <h3>Stage-wise Fertilizer Application</h3>
+    `;
+    
+    results.recommendations.forEach((stage, index) => {
+        // Get expected and actual NPK for this stage
+        const expected = results.expectedNPKPerStage[index];
+        const actual = results.actualNPKPerStage[index];
+        
+        html += `
+            <div class="stage-header">Stage ${index + 1}: ${stage.stage}</div>
+        `;
+        
+        // Display NPK breakdown for this stage
+        if (expected && actual) {
+            html += `
+                <div style="background: #f8f9fa; padding: 12px; margin: 10px 0; border-radius: 5px; border-left: 3px solid #3498db;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 0.9em;">
+                        <div>
+                            <strong style="color: #27ae60;">N (kg/acre):</strong><br>
+                            Expected: ${expected.expectedN.toFixed(2)} (${(expected.nRatio * 100).toFixed(0)}%)<br>
+                            Actual: <strong>${actual.actualN.toFixed(2)}</strong>
+                            ${Math.abs(actual.actualN - expected.expectedN) > 0.1 ? 
+                                `<span style="color: ${actual.actualN < expected.expectedN ? '#e74c3c' : '#27ae60'};">
+                                    (${actual.actualN > expected.expectedN ? '+' : ''}${(actual.actualN - expected.expectedN).toFixed(2)})
+                                </span>` : 
+                                '<span style="color: #27ae60;">✓</span>'}
+                        </div>
+                        <div>
+                            <strong style="color: #e67e22;">P (kg/acre):</strong><br>
+                            Expected: ${expected.expectedP.toFixed(2)}<br>
+                            Actual: <strong>${actual.actualP.toFixed(2)}</strong>
+                            ${Math.abs(actual.actualP - expected.expectedP) > 0.1 ? 
+                                `<span style="color: ${actual.actualP < expected.expectedP ? '#e74c3c' : '#27ae60'};">
+                                    (${actual.actualP > expected.expectedP ? '+' : ''}${(actual.actualP - expected.expectedP).toFixed(2)})
+                                </span>` : 
+                                '<span style="color: #27ae60;">✓</span>'}
+                        </div>
+                        <div>
+                            <strong style="color: #8e44ad;">K (kg/acre):</strong><br>
+                            Expected: ${expected.expectedK.toFixed(2)} ${expected.kRatio > 0 ? `(${(expected.kRatio * 100).toFixed(0)}%)` : ''}<br>
+                            Actual: <strong>${actual.actualK.toFixed(2)}</strong>
+                            ${expected.kRatio > 0 && Math.abs(actual.actualK - expected.expectedK) > 0.1 ? 
+                                `<span style="color: ${actual.actualK < expected.expectedK ? '#e74c3c' : '#27ae60'};">
+                                    (${actual.actualK > expected.expectedK ? '+' : ''}${(actual.actualK - expected.expectedK).toFixed(2)})
+                                </span>` : 
+                                expected.kRatio > 0 ? '<span style="color: #27ae60;">✓</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (stage.fertilizers.length === 0) {
+            html += `<p style="padding: 10px; color: #666;">No fertilizers required for this stage.</p>`;
+        } else {
+            stage.fertilizers.forEach(fert => {
+                html += `
+                    <div class="fertilizer-item">
+                        <span class="fertilizer-name">${fert.name}</span>
+                        <span class="fertilizer-details">
+                            <strong>${fert.label || fert.kgs.toFixed(2) + ' kg'}</strong>
+                        </span>
+                    </div>
+                `;
+            });
+        }
+    });
+    
+    html += `</div>`;
+    
+    // ENHANCEMENT: Nutrient Contribution Table (Excel format)
+    if (results.nutrientContributionTable && results.nutrientContributionTable.length > 0) {
+        html += `
+            <div class="recommendation-card">
+                <h3>📊 Nutrient Contribution Table (Excel Format)</h3>
+        `;
+        
+        results.nutrientContributionTable.forEach((stageData, idx) => {
+            html += `
+                <div style="margin-top: ${idx > 0 ? '30px' : '0'};">
+                    <h4 style="color: #2c3e50; margin-bottom: 10px;">Stage: ${stageData.stage}</h4>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em;">
+                        <thead>
+                            <tr style="background: #3498db; color: white;">
+                                <th style="padding: 10px; text-align: left; border: 1px solid #2980b9;">Fertilizer</th>
+                                <th style="padding: 10px; text-align: center; border: 1px solid #2980b9;">Qty (kg)</th>
+                                <th style="padding: 10px; text-align: center; border: 1px solid #2980b9;">N (kg)</th>
+                                <th style="padding: 10px; text-align: center; border: 1px solid #2980b9;">P (kg)</th>
+                                <th style="padding: 10px; text-align: center; border: 1px solid #2980b9;">K (kg)</th>
+                                <th style="padding: 10px; text-align: center; border: 1px solid #2980b9;">S (kg)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            stageData.fertilizers.forEach(fert => {
+                html += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>${fert.name}</strong></td>
+                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${fert.qty.toFixed(1)}</td>
+                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${fert.n.toFixed(2)}</td>
+                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${fert.p.toFixed(2)}</td>
+                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${fert.k.toFixed(2)}</td>
+                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${fert.s.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                            <tr style="background: #ecf0f1; font-weight: bold;">
+                                <td style="padding: 8px; border: 1px solid #ddd;">Total</td>
+                                <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${stageData.fertilizers.reduce((sum, f) => sum + f.qty, 0).toFixed(1)}</td>
+                                <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${stageData.totals.n.toFixed(2)}</td>
+                                <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${stageData.totals.p.toFixed(2)}</td>
+                                <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${stageData.totals.k.toFixed(2)}</td>
+                                <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${stageData.totals.s.toFixed(2)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+    }
+    
+    // ENHANCEMENT: Balance Tracking
+    if (results.balanceTracking) {
+        html += `
+            <div class="recommendation-card">
+                <h3>⚖️ Balance Tracking (Remaining Nutrients)</h3>
+                <div style="margin-top: 15px;">
+                    <div style="padding: 12px; background: #e3f2fd; border-radius: 5px; margin-bottom: 10px;">
+                        <strong>Initial Balance:</strong> N=${results.balanceTracking.initial.n.toFixed(2)} kg, P=${results.balanceTracking.initial.p.toFixed(2)} kg, K=${results.balanceTracking.initial.k.toFixed(2)} kg
+                    </div>
+        `;
+        
+        if (results.balanceTracking.afterBasal) {
+            const bal = results.balanceTracking.afterBasal;
+            const isComplete = Math.abs(bal.n) < 0.1 && Math.abs(bal.p) < 0.1 && Math.abs(bal.k) < 0.1;
+            html += `
+                    <div style="padding: 12px; background: ${isComplete ? '#e8f5e9' : '#fff3e0'}; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid ${isComplete ? '#4caf50' : '#ff9800'};">
+                        <strong>After Basal Application:</strong><br>
+                        N Balance: <span style="color: ${bal.n < -0.1 ? '#e74c3c' : bal.n > 0.1 ? '#27ae60' : '#666'};">${bal.n.toFixed(2)} kg</span> ${Math.abs(bal.n) < 0.1 ? '✓' : ''}<br>
+                        P Balance: <span style="color: ${bal.p < -0.1 ? '#e74c3c' : bal.p > 0.1 ? '#27ae60' : '#666'};">${bal.p.toFixed(2)} kg</span> ${Math.abs(bal.p) < 0.1 ? '✓' : ''}<br>
+                        K Balance: <span style="color: ${bal.k < -0.1 ? '#e74c3c' : bal.k > 0.1 ? '#27ae60' : '#666'};">${bal.k.toFixed(2)} kg</span> ${Math.abs(bal.k) < 0.1 ? '✓' : ''}
+                    </div>
+            `;
+        }
+        
+        if (results.balanceTracking.afterTop1) {
+            const bal = results.balanceTracking.afterTop1;
+            const isComplete = Math.abs(bal.n) < 0.1 && Math.abs(bal.p) < 0.1 && Math.abs(bal.k) < 0.1;
+            html += `
+                    <div style="padding: 12px; background: ${isComplete ? '#e8f5e9' : '#fff3e0'}; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid ${isComplete ? '#4caf50' : '#ff9800'};">
+                        <strong>After 1st Top Dressing:</strong><br>
+                        N Balance: <span style="color: ${bal.n < -0.1 ? '#e74c3c' : bal.n > 0.1 ? '#27ae60' : '#666'};">${bal.n.toFixed(2)} kg</span> ${Math.abs(bal.n) < 0.1 ? '✓' : ''}<br>
+                        P Balance: <span style="color: ${bal.p < -0.1 ? '#e74c3c' : bal.p > 0.1 ? '#27ae60' : '#666'};">${bal.p.toFixed(2)} kg</span> ${Math.abs(bal.p) < 0.1 ? '✓' : ''}<br>
+                        K Balance: <span style="color: ${bal.k < -0.1 ? '#e74c3c' : bal.k > 0.1 ? '#27ae60' : '#666'};">${bal.k.toFixed(2)} kg</span> ${Math.abs(bal.k) < 0.1 ? '✓' : ''}
+                    </div>
+            `;
+        }
+        
+        if (results.balanceTracking.afterTop2) {
+            const bal = results.balanceTracking.afterTop2;
+            const isComplete = Math.abs(bal.n) < 0.1 && Math.abs(bal.p) < 0.1 && Math.abs(bal.k) < 0.1;
+            html += `
+                    <div style="padding: 12px; background: ${isComplete ? '#e8f5e9' : '#fff3e0'}; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid ${isComplete ? '#4caf50' : '#ff9800'};">
+                        <strong>After 2nd Top Dressing:</strong><br>
+                        N Balance: <span style="color: ${bal.n < -0.1 ? '#e74c3c' : bal.n > 0.1 ? '#27ae60' : '#666'};">${bal.n.toFixed(2)} kg</span> ${Math.abs(bal.n) < 0.1 ? '✓' : ''}<br>
+                        P Balance: <span style="color: ${bal.p < -0.1 ? '#e74c3c' : bal.p > 0.1 ? '#27ae60' : '#666'};">${bal.p.toFixed(2)} kg</span> ${Math.abs(bal.p) < 0.1 ? '✓' : ''}<br>
+                        K Balance: <span style="color: ${bal.k < -0.1 ? '#e74c3c' : bal.k > 0.1 ? '#27ae60' : '#666'};">${bal.k.toFixed(2)} kg</span> ${Math.abs(bal.k) < 0.1 ? '✓' : ''}
+                    </div>
+            `;
+        }
+        
+        html += `</div></div>`;
+    }
+    
+    // ENHANCEMENT: Remarks/Notes
+    if (results.remarks && results.remarks.length > 0) {
+        html += `
+            <div class="recommendation-card">
+                <h3>📝 Remarks & Notes</h3>
+                <ul style="line-height: 1.8;">
+        `;
+        results.remarks.forEach(remark => {
+            html += `<li style="margin-bottom: 8px;">${remark}</li>`;
+        });
+        html += `</ul></div>`;
+    }
+    
+    resultsContent.innerHTML = html;
+    resultsSection.style.display = 'block';
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ─── FORM SUBMISSION ────────────────────────────────────────────────────────
+// Called directly by onclick="handleFormSubmission()" on the button.
+// Synchronous outer wrapper so onclick never swallows a rejected Promise.
+function handleFormSubmission() {
+    _runFormSubmission().catch(function(err) {
+        console.error('[handleFormSubmission] Unhandled error:', err);
+        alert('❌ Unexpected error: ' + (err.message || err));
+    });
+}
+
+async function _runFormSubmission() {
+    const btn = document.getElementById('getRecommendationBtn');
+    const originalText = btn ? btn.textContent : 'Get Recommendation';
+
+    // Show loading state immediately so user knows button worked
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Processing...'; }
+
+    try {
+        // Get form reference
+        const form = document.getElementById('soilTestForm');
+        if (!form) throw new Error('Form not found on page');
+        
+        // Wait for crop/location data to load
+        if (Object.keys(cropsData).length === 0) {
+            await loadData();
+        }
+        
+        // Read all form values
+        const formData = {
+            crop:             document.getElementById('crop').value,
+            organicCarbon:    document.getElementById('organicCarbon').value,
+            nitrogen:         document.getElementById('nitrogen').value,
+            phosphorus:       document.getElementById('phosphorus').value,
+            potassium:        document.getElementById('potassium').value,
+            season:           document.getElementById('season').value,
+            fieldType:        document.getElementById('fieldType').value,
+            location:         document.getElementById('location').value,
+            sulfur:           document.getElementById('sulfur').value,
+            ph:               document.getElementById('ph').value,
+            gromorCombination:document.getElementById('gromorCombination').value,
+            soilType:         document.getElementById('soilType').value,
+            ec:               document.getElementById('ec').value,
+            calcium:          document.getElementById('calcium').value,
+            magnesium:        document.getElementById('magnesium').value,
+            zinc:             document.getElementById('zinc').value,
+            boron:            document.getElementById('boron').value,
+            manganese:        document.getElementById('manganese').value,
+            iron:             document.getElementById('iron').value,
+            copper:           document.getElementById('copper').value,
+            molybdenum:       document.getElementById('molybdenum').value,
+            chlorine:         document.getElementById('chlorine').value
+        };
+        
+        // Read fertilizer preferences
+        const preferences = {};
+        form.querySelectorAll('[name^="pref_"]').forEach(input => {
+            preferences[input.name.replace('pref_', '')] = input.value;
+        });
+        formData.preferences = preferences;
+        
+        // Validate required fields - show clear alerts
+        if (!formData.crop) {
+            alert('⚠️ Please select a Crop before getting recommendations.');
+            document.getElementById('crop').focus();
+            return;
+        }
+        if (!formData.location) {
+            alert('⚠️ Please select a Location/Area before getting recommendations.');
+            document.getElementById('location').focus();
+            return;
+        }
+        if (!formData.season) {
+            alert('⚠️ Please select a Season before getting recommendations.');
+            document.getElementById('season').focus();
+            return;
+        }
+        if (!formData.fieldType) {
+            alert('⚠️ Please select a Field Type before getting recommendations.');
+            document.getElementById('fieldType').focus();
+            return;
+        }
+        
+        // Run calculation
+        console.log('[handleFormSubmission] Running calculation with:', formData);
+        const results = calculateRecommendations(formData);
+        displayResults(results);
+        
+    } catch (error) {
+        console.error('[handleFormSubmission] Error:', error);
+        const errorMsg = error.message || 'Unknown error occurred';
+        
+        // Show error in results section
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsContent = document.getElementById('resultsContent');
+        if (resultsSection && resultsContent) {
+            resultsSection.style.display = 'block';
+            resultsContent.innerHTML = `
+                <div style="padding:20px;background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:5px;">
+                    <h3 style="margin-top:0;">❌ Error Generating Recommendation</h3>
+                    <p><strong>Error:</strong> ${errorMsg}</p>
+                    <p>Please check browser console (F12) for details.</p>
+                </div>`;
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            alert('❌ Error: ' + errorMsg + '\n\nCheck browser console (F12) for details.');
+        }
+    } finally {
+        // Always restore button
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    }
+}
+
+// Save Payload Function
+function savePayload() {
+    const form = document.getElementById('soilTestForm');
+    const formData = new FormData(form);
+    const payload = {};
+    
+    // Save all form fields
+    for (let [key, value] of formData.entries()) {
+        payload[key] = value;
+    }
+    
+    // Also save all select and input values explicitly
+    payload.crop = document.getElementById('crop').value;
+    payload.organicCarbon = document.getElementById('organicCarbon').value;
+    payload.nitrogen = document.getElementById('nitrogen').value;
+    payload.phosphorus = document.getElementById('phosphorus').value;
+    payload.potassium = document.getElementById('potassium').value;
+    payload.season = document.getElementById('season').value;
+    payload.fieldType = document.getElementById('fieldType').value;
+    payload.location = document.getElementById('location').value;
+        payload.sulfur = document.getElementById('sulfur').value;
+        payload.ph = document.getElementById('ph').value;
+        payload.gromorCombination = document.getElementById('gromorCombination').value;
+        payload.soilType = document.getElementById('soilType').value;
+        payload.ec = document.getElementById('ec').value;
+        payload.calcium = document.getElementById('calcium').value;
+        payload.magnesium = document.getElementById('magnesium').value;
+        payload.zinc = document.getElementById('zinc').value;
+        payload.boron = document.getElementById('boron').value;
+        payload.manganese = document.getElementById('manganese').value;
+        payload.iron = document.getElementById('iron').value;
+        payload.copper = document.getElementById('copper').value;
+        payload.molybdenum = document.getElementById('molybdenum').value;
+        payload.chlorine = document.getElementById('chlorine').value;
+    
+    // Save all fertilizer preferences
+    const prefInputs = form.querySelectorAll('[name^="pref_"]');
+    prefInputs.forEach(input => {
+        payload[input.name] = input.value;
+    });
+    
+    // Save to localStorage
+    localStorage.setItem('soilTestPayload', JSON.stringify(payload));
+    
+    // Show notification
+    showPayloadNotification('Payload saved successfully!', 'success');
+}
+
+// Load Payload Function
+function loadPayload() {
+    const savedPayload = localStorage.getItem('soilTestPayload');
+    
+    if (!savedPayload) {
+        showPayloadNotification('No saved payload found!', 'error');
+        return;
+    }
+    
+    try {
+        const payload = JSON.parse(savedPayload);
+        const form = document.getElementById('soilTestForm');
+        
+        // Load all form fields
+        Object.keys(payload).forEach(key => {
+            const element = form.querySelector(`[name="${key}"]`);
+            if (element) {
+                if (element.type === 'checkbox' || element.type === 'radio') {
+                    element.checked = payload[key] === element.value;
+                } else {
+                    element.value = payload[key] || '';
+                }
+            }
+        });
+        
+        // Explicitly set main fields
+        if (payload.crop) document.getElementById('crop').value = payload.crop;
+        if (payload.organicCarbon) document.getElementById('organicCarbon').value = payload.organicCarbon;
+        if (payload.nitrogen) document.getElementById('nitrogen').value = payload.nitrogen;
+        if (payload.phosphorus) document.getElementById('phosphorus').value = payload.phosphorus;
+        if (payload.potassium) document.getElementById('potassium').value = payload.potassium;
+        if (payload.season) document.getElementById('season').value = payload.season;
+        if (payload.fieldType) document.getElementById('fieldType').value = payload.fieldType;
+        if (payload.location) document.getElementById('location').value = payload.location;
+        if (payload.sulfur) document.getElementById('sulfur').value = payload.sulfur;
+        if (payload.ph) document.getElementById('ph').value = payload.ph;
+        if (payload.gromorCombination) document.getElementById('gromorCombination').value = payload.gromorCombination;
+        if (payload.soilType) document.getElementById('soilType').value = payload.soilType;
+        if (payload.ec) document.getElementById('ec').value = payload.ec;
+        if (payload.calcium) document.getElementById('calcium').value = payload.calcium;
+        if (payload.magnesium) document.getElementById('magnesium').value = payload.magnesium;
+        if (payload.zinc) document.getElementById('zinc').value = payload.zinc;
+        if (payload.boron) document.getElementById('boron').value = payload.boron;
+        if (payload.manganese) document.getElementById('manganese').value = payload.manganese;
+        if (payload.iron) document.getElementById('iron').value = payload.iron;
+        if (payload.copper) document.getElementById('copper').value = payload.copper;
+        if (payload.molybdenum) document.getElementById('molybdenum').value = payload.molybdenum;
+        if (payload.chlorine) document.getElementById('chlorine').value = payload.chlorine;
+        
+        // Load fertilizer preferences
+        const prefInputs = form.querySelectorAll('[name^="pref_"]');
+        prefInputs.forEach(input => {
+            if (payload[input.name]) {
+                input.value = payload[input.name];
+            }
+        });
+        
+        showPayloadNotification('Payload loaded successfully! You can now click "Get Recommendation".', 'success');
+        
+        // Scroll to top of form
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+    } catch (error) {
+        showPayloadNotification('Error loading payload: ' + error.message, 'error');
+        console.error('Error loading payload:', error);
+    }
+}
+
+// Show Notification Function
+function showPayloadNotification(message, type) {
+    const notification = document.getElementById('payloadNotification');
+    notification.textContent = message;
+    notification.style.display = 'block';
+    
+    if (type === 'success') {
+        notification.style.background = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.border = '1px solid #c3e6cb';
+    } else {
+        notification.style.background = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.border = '1px solid #f5c6cb';
+    }
+    
+    // Hide notification after 5 seconds
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 5000);
+}
+
+// Add event listeners for save/load buttons
+document.addEventListener('DOMContentLoaded', function() {
+    const saveBtn = document.getElementById('savePayloadBtn');
+    const loadBtn = document.getElementById('loadPayloadBtn');
+    
+    if (saveBtn) {
+        saveBtn.addEventListener('click', savePayload);
+    }
+    
+    if (loadBtn) {
+        loadBtn.addEventListener('click', loadPayload);
+    }
+});
+

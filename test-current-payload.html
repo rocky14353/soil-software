@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Current Payload</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .result { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 5px solid #2196F3; }
+        .success { border-left-color: #4CAF50; }
+        .error { border-left-color: #f44336; }
+        button { background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
+        pre { background: #f5f5f5; padding: 15px; overflow-x: auto; border-radius: 4px; }
+        .info { background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 10px 0; }
+        .warning { background: #fff3e0; padding: 15px; border-radius: 4px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Current Payload</h1>
+    <button onclick="testPayload()">Run Test</button>
+    <button onclick="showPayload()">Show Payload</button>
+    <div id="results"></div>
+
+    <script src="script.js"></script>
+    <script>
+        const testPayloadData = {
+            crop: "Paddy lowland",
+            organicCarbon: 0.6,
+            nitrogen: 150,
+            phosphorus: 9,
+            potassium: 50,
+            season: "Rabi",
+            fieldType: "Irrigated",
+            location: "SOUTH TELENGANA",
+            sulfur: 9,
+            ph: 7.5,
+            soilType: "Medium",
+            ec: 0.6,
+            calcium: 20,
+            magnesium: 50,
+            zinc: 5,
+            boron: 0.5,
+            manganese: 20,
+            iron: 50,
+            copper: 20,
+            molybdenum: 0.5,
+            chlorine: 10,
+            gromorCombination: "Auto-select based on Location",
+            pref_28_28_0: "Optional",
+            pref_14_35_14: "Optional",
+            pref_20_20_0: "Optional",
+            pref_10_26_26: "Optional",
+            pref_16_20_0: "Optional",
+            pref_Urea: "Optional",
+            pref_MOP: "Optional",
+            pref_SOP: "Optional",
+            pref_SSP: "Optional"
+        };
+
+        function showPayload() {
+            const results = document.getElementById('results');
+            results.innerHTML = `
+                <div class="info">
+                    <h3>📋 Test Payload</h3>
+                    <pre>${JSON.stringify(testPayloadData, null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        function testPayload() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Running test...</p>';
+            
+            try {
+                const result = calculateRecommendations(testPayloadData);
+                
+                // Calculate validation status
+                const recommendedN = result.recommendedNPK?.n || 0;
+                const recommendedP = result.recommendedNPK?.p || 0;
+                const recommendedK = result.recommendedNPK?.k || 0;
+                
+                const deliveredN = result.deliveredNPK?.n || 0;
+                const deliveredP = result.deliveredNPK?.p || 0;
+                const deliveredK = result.deliveredNPK?.k || 0;
+                
+                const tolerance = 0.12; // 12%
+                const minRequiredN = recommendedN * (1 - tolerance);
+                const minRequiredP = recommendedP * (1 - tolerance);
+                const minRequiredK = recommendedK * (1 - tolerance);
+                
+                const nPass = deliveredN >= minRequiredN;
+                const pPass = deliveredP >= minRequiredP;
+                const kPass = deliveredK >= minRequiredK;
+                const allPass = nPass && pPass && kPass;
+                
+                // Calculate excess
+                const excessN = Math.max(0, deliveredN - recommendedN);
+                const excessP = Math.max(0, deliveredP - recommendedP);
+                const excessK = Math.max(0, deliveredK - recommendedK);
+                
+                const excessNPercent = recommendedN > 0 ? (excessN / recommendedN) * 100 : 0;
+                const excessPPercent = recommendedP > 0 ? (excessP / recommendedP) * 100 : 0;
+                const excessKPercent = recommendedK > 0 ? (excessK / recommendedK) * 100 : 0;
+                
+                const withinTolerance = excessNPercent <= 12 && excessPPercent <= 12 && excessKPercent <= 12;
+                
+                let html = `
+                    <div class="result ${allPass ? 'success' : 'error'}">
+                        <h2>${allPass ? '✅ VALIDATION PASSED' : '❌ VALIDATION FAILED'}</h2>
+                        
+                        <div class="info">
+                            <h3>📊 Summary</h3>
+                            <p><strong>Location:</strong> ${result.location}</p>
+                            <p><strong>Crop:</strong> ${result.crop}</p>
+                            <p><strong>Season:</strong> ${result.season}</p>
+                            <p><strong>Combination:</strong> ${result.combination?.name || 'N/A'}</p>
+                        </div>
+                        
+                        <div class="info">
+                            <h3>🎯 Recommendations vs Delivered</h3>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr style="background: #f5f5f5;">
+                                    <th style="padding: 10px; text-align: left;">Nutrient</th>
+                                    <th style="padding: 10px; text-align: right;">Recommended</th>
+                                    <th style="padding: 10px; text-align: right;">Delivered</th>
+                                    <th style="padding: 10px; text-align: right;">Minimum (88%)</th>
+                                    <th style="padding: 10px; text-align: center;">Status</th>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px;"><strong>Nitrogen (N)</strong></td>
+                                    <td style="padding: 10px; text-align: right;">${recommendedN.toFixed(2)} kg/acre</td>
+                                    <td style="padding: 10px; text-align: right;">${deliveredN.toFixed(2)} kg/acre</td>
+                                    <td style="padding: 10px; text-align: right;">${minRequiredN.toFixed(2)} kg/acre</td>
+                                    <td style="padding: 10px; text-align: center;">${nPass ? '✅' : '❌'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px;"><strong>Phosphorus (P)</strong></td>
+                                    <td style="padding: 10px; text-align: right;">${recommendedP.toFixed(2)} kg/acre</td>
+                                    <td style="padding: 10px; text-align: right;">${deliveredP.toFixed(2)} kg/acre</td>
+                                    <td style="padding: 10px; text-align: right;">${minRequiredP.toFixed(2)} kg/acre</td>
+                                    <td style="padding: 10px; text-align: center;">${pPass ? '✅' : '❌'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px;"><strong>Potassium (K)</strong></td>
+                                    <td style="padding: 10px; text-align: right;">${recommendedK.toFixed(2)} kg/acre</td>
+                                    <td style="padding: 10px; text-align: right;">${deliveredK.toFixed(2)} kg/acre</td>
+                                    <td style="padding: 10px; text-align: right;">${minRequiredK.toFixed(2)} kg/acre</td>
+                                    <td style="padding: 10px; text-align: center;">${kPass ? '✅' : '❌'}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="info">
+                            <h3>📈 Excess Analysis</h3>
+                            <p><strong>N Excess:</strong> ${excessN.toFixed(2)} kg (${excessNPercent.toFixed(1)}%) ${excessNPercent <= 12 ? '✅' : '⚠️'}</p>
+                            <p><strong>P Excess:</strong> ${excessP.toFixed(2)} kg (${excessPPercent.toFixed(1)}%) ${excessPPercent <= 12 ? '✅' : '⚠️'}</p>
+                            <p><strong>K Excess:</strong> ${excessK.toFixed(2)} kg (${excessKPercent.toFixed(1)}%) ${excessKPercent <= 12 ? '✅' : '⚠️'}</p>
+                            <p><strong>Within Tolerance:</strong> ${withinTolerance ? '✅ Yes' : '⚠️ No'}</p>
+                        </div>
+                        
+                        <div class="info">
+                            <h3>🌾 Stage-wise Application</h3>
+                `;
+                
+                if (result.recommendations && result.recommendations.length > 0) {
+                    result.recommendations.forEach((stage, idx) => {
+                        let stageN = 0, stageP = 0, stageK = 0;
+                        stage.fertilizers.forEach(f => {
+                            stageN += f.nContributed || 0;
+                            stageP += f.pContributed || 0;
+                            stageK += f.kContributed || 0;
+                        });
+                        
+                        html += `
+                            <div style="margin: 15px 0; padding: 15px; background: #f9f9f9; border-radius: 4px;">
+                                <h4>${stage.stage}</h4>
+                                <p><strong>N:</strong> ${stageN.toFixed(2)} kg | <strong>P:</strong> ${stageP.toFixed(2)} kg | <strong>K:</strong> ${stageK.toFixed(2)} kg</p>
+                                <ul>
+                        `;
+                        stage.fertilizers.forEach(f => {
+                            html += `<li>${f.name}: ${f.kgs.toFixed(2)} kgs (${f.bags ? f.bags.toFixed(2) : (f.kgs/45).toFixed(2)} bag(s))</li>`;
+                        });
+                        html += `</ul></div>`;
+                    });
+                }
+                
+                html += `
+                        </div>
+                        
+                        <div class="info">
+                            <h3>🔍 Full Response</h3>
+                            <pre>${JSON.stringify(result, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+                
+                results.innerHTML = html;
+                
+            } catch (error) {
+                results.innerHTML = `
+                    <div class="result error">
+                        <h2>❌ ERROR</h2>
+                        <p><strong>Error Message:</strong></p>
+                        <pre>${error.message}</pre>
+                        <p><strong>Stack Trace:</strong></p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,1107 @@
+{
+  "Paddy Upland": {
+    "irrigated": {
+      "rabi": {
+        "n": 32,
+        "p": 12,
+        "k": 12,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.3333, 0.3333, 0.3333],
+            "stages": ["Basal", "at Tillering", "at Panicle"]
+          },
+          "p": {
+            "count": 2,
+            "ratios": [0.6, 0.4],
+            "stages": ["Basal", "at Tillering"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at Panicle"]
+          }
+        }
+      }
+    }
+  },
+  "Paddy Mediumland": {
+    "irrigated": {
+      "rabi": {
+        "n": 32,
+        "p": 16,
+        "k": 16,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.3333, 0.3333, 0.3333],
+            "stages": ["Basal", "at Tillering", "at Panicle"]
+          },
+          "p": {
+            "count": 2,
+            "ratios": [0.6, 0.4],
+            "stages": ["Basal", "at Tillering"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at Panicle"]
+          }
+        }
+      }
+    }
+  },
+  "Paddy lowland": {
+    "irrigated": {
+      "rabi": {
+        "n": 40,
+        "p": 20,
+        "k": 20,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.3333, 0.3333, 0.3333],
+            "stages": ["Basal", "at Tillering", "at Panicle"]
+          },
+          "p": {
+            "count": 2,
+            "ratios": [0.6, 0.4],
+            "stages": ["Basal", "at Tillering"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at Panicle"]
+          }
+        }
+      }
+    }
+  },
+  "Maize": {
+    "irrigated": {
+      "rabi": {
+        "n": 48,
+        "p": 24,
+        "k": 20,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.25, 0.5, 0.25],
+            "stages": ["Basal", "at 25 days", "at 55 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 55 days"]
+          }
+        }
+      }
+    }
+  },
+  "Jowar": {
+    "irrigated": {
+      "rabi": {
+        "n": 24,
+        "p": 12,
+        "k": 12,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.25, 0.5, 0.25],
+            "stages": ["Basal", "at 25 days", "at 55 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 55 days"]
+          }
+        }
+      }
+    }
+  },
+  "Fingermillet(Ragi)": {
+    "irrigated": {
+      "rabi": {
+        "n": 16,
+        "p": 10,
+        "k": 10,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at hoeing"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at hoeing"]
+          }
+        }
+      }
+    }
+  },
+  "Cow Pea": {
+    "irrigated": {
+      "rabi": {
+        "n": 10,
+        "p": 20,
+        "k": 10,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    },
+    "rainfed": {
+      "rabi": {
+        "n": 10,
+        "p": 20,
+        "k": 10,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    }
+  },
+  "Redgram": {
+    "irrigated": {
+      "rabi": {
+        "n": 10,
+        "p": 24,
+        "k": 10,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    }
+  },
+  "Soyabean": {
+    "irrigated": {
+      "rabi": {
+        "n": 16,
+        "p": 12,
+        "k": 12,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    }
+  },
+  "Groundnut": {
+    "irrigated": {
+      "rabi": {
+        "n": 8,
+        "p": 16,
+        "k": 16,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    }
+  },
+  "Mustard": {
+    "irrigated": {
+      "rabi": {
+        "n": 24,
+        "p": 12,
+        "k": 12,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    },
+    "rainfed": {
+      "rabi": {
+        "n": 24,
+        "p": 12,
+        "k": 12,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    }
+  },
+  "Sunflower": {
+    "irrigated": {
+      "rabi": {
+        "n": 16,
+        "p": 16,
+        "k": 8,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Sesamum": {
+    "irrigated": {
+      "rabi": {
+        "n": 12,
+        "p": 8,
+        "k": 8,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at hoeing"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at hoeing"]
+          }
+        }
+      }
+    }
+  },
+  "Castor": {
+    "irrigated": {
+      "rabi": {
+        "n": 20,
+        "p": 30,
+        "k": 20,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at hoeing"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at hoeing"]
+          }
+        }
+      }
+    }
+  },
+  "Niger": {
+    "irrigated": {
+      "rabi": {
+        "n": 16,
+        "p": 8,
+        "k": 8,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.75, 0.25],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Jute": {
+    "irrigated": {
+      "rabi": {
+        "n": 24,
+        "p": 10,
+        "k": 10,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Sugarcane": {
+    "irrigated": {
+      "rabi": {
+        "n": 80,
+        "p": 24,
+        "k": 24,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.33, 0.33, 0.33],
+            "stages": ["at 30 days", "at 60 days", "at 90 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["at 30 days", "at 90 days"]
+          }
+        }
+      }
+    }
+  },
+  "Wheat": {
+    "irrigated": {
+      "rabi": {
+        "n": 32,
+        "p": 20,
+        "k": 16,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 21 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 21 days"]
+          }
+        }
+      }
+    }
+  },
+  "Betalvine": {
+    "irrigated": {
+      "rabi": {
+        "n": 80,
+        "p": 40,
+        "k": 50,
+        "splits": {
+          "n": {
+            "count": 4,
+            "ratios": [0.25, 0.25, 0.25, 0.25],
+            "stages": ["at 90 days", "at 120 days", "at 240 days", "at 360 days"]
+          },
+          "k": {
+            "count": 4,
+            "ratios": [0.25, 0.25, 0.25, 0.25],
+            "stages": ["at 90 days", "at 120 days", "at 240 days", "at 360 days"]
+          }
+        }
+      }
+    }
+  },
+  "Ladiesfinger(Bhindi)": {
+    "irrigated": {
+      "rabi": {
+        "n": 30,
+        "p": 20,
+        "k": 20,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 25 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 25 days"]
+          }
+        }
+      }
+    }
+  },
+  "Brinjal": {
+    "irrigated": {
+      "rabi": {
+        "n": 50,
+        "p": 32,
+        "k": 40,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.5, 0.25, 0.25],
+            "stages": ["Basal", "at 20 days", "at 40 days"]
+          },
+          "k": {
+            "count": 3,
+            "ratios": [0.5, 0.25, 0.25],
+            "stages": ["Basal", "at 20 days", "at 40 days"]
+          }
+        }
+      }
+    }
+  },
+  "Sweet potato": {
+    "irrigated": {
+      "rabi": {
+        "n": 40,
+        "p": 30,
+        "k": 40,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Pumpkin": {
+    "irrigated": {
+      "rabi": {
+        "n": 30,
+        "p": 30,
+        "k": 30,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Spine gourd": {
+    "irrigated": {
+      "rabi": {
+        "n": 24,
+        "p": 16,
+        "k": 16,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.33, 0.33, 0.33],
+            "stages": ["at 15 days", "at 30 days", "at 45 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["at 15 days", "at 45 days"]
+          }
+        }
+      }
+    }
+  },
+  "Gerkin(Coccinia)": {
+    "irrigated": {
+      "rabi": {
+        "n": 24,
+        "p": 16,
+        "k": 16,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Jun-July", "sept-Oct"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Jun-July", "sept-Oct"]
+          }
+        }
+      }
+    }
+  },
+  "Pointed gourd": {
+    "irrigated": {
+      "rabi": {
+        "n": 48,
+        "p": 32,
+        "k": 32,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.33, 0.33, 0.33],
+            "stages": ["Basal", "at 20 days", "at 40 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 40 days"]
+          }
+        }
+      }
+    }
+  },
+  "Onion": {
+    "irrigated": {
+      "rabi": {
+        "n": 48,
+        "p": 24,
+        "k": 40,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.33, 0.33, 0.33],
+            "stages": ["Basal", "at 20 days", "at 40 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.6, 0.4],
+            "stages": ["Basal", "at 40 days"]
+          }
+        }
+      }
+    }
+  },
+  "Chillie": {
+    "irrigated": {
+      "rabi": {
+        "n": 44,
+        "p": 28,
+        "k": 30,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 45 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 45 days"]
+          }
+        }
+      }
+    }
+  },
+  "Garlic": {
+    "irrigated": {
+      "rabi": {
+        "n": 48,
+        "p": 24,
+        "k": 48,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.5, 0.25, 0.25],
+            "stages": ["Basal", "at 20 days", "at 40 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 40 days"]
+          }
+        }
+      }
+    }
+  },
+  "Ginger": {
+    "irrigated": {
+      "rabi": {
+        "n": 50,
+        "p": 40,
+        "k": 40,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 45 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 45 days"]
+          }
+        }
+      }
+    }
+  },
+  "Turmeric": {
+    "irrigated": {
+      "rabi": {
+        "n": 24,
+        "p": 12,
+        "k": 36,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 45 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 45 days"]
+          }
+        }
+      }
+    }
+  },
+  "Tomato": {
+    "irrigated": {
+      "rabi": {
+        "n": 48,
+        "p": 30,
+        "k": 40,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.6, 0.4],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Cauliflower": {
+    "irrigated": {
+      "rabi": {
+        "n": 48,
+        "p": 24,
+        "k": 24,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.7, 0.3],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Cabbage": {
+    "irrigated": {
+      "rabi": {
+        "n": 60,
+        "p": 20,
+        "k": 30,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.6, 0.4],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "French bean": {
+    "irrigated": {
+      "rabi": {
+        "n": 20,
+        "p": 32,
+        "k": 32,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 20 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 20 days"]
+          }
+        }
+      }
+    }
+  },
+  "Pea": {
+    "irrigated": {
+      "rabi": {
+        "n": 12,
+        "p": 20,
+        "k": 20,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 20 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 20 days"]
+          }
+        }
+      }
+    }
+  },
+  "Carrot": {
+    "irrigated": {
+      "rabi": {
+        "n": 20,
+        "p": 20,
+        "k": 30,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Radish": {
+    "irrigated": {
+      "rabi": {
+        "n": 20,
+        "p": 20,
+        "k": 30,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 20 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 20 days"]
+          }
+        }
+      }
+    }
+  },
+  "Capsicum": {
+    "irrigated": {
+      "rabi": {
+        "n": 48,
+        "p": 24,
+        "k": 48,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.2, 0.4, 0.4],
+            "stages": ["Basal", "at 20 days", "at 40 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 40 days"]
+          }
+        }
+      }
+    }
+  },
+  "Pineapple": {
+    "irrigated": {
+      "rabi": {
+        "n": 140,
+        "p": 52,
+        "k": 16,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.33, 0.33, 0.33],
+            "stages": ["at 60 days", "at 150 days", "at 240 days"]
+          },
+          "k": {
+            "count": 3,
+            "ratios": [0.33, 0.33, 0.33],
+            "stages": ["at 60 days", "at 150 days", "at 240 days"]
+          }
+        }
+      }
+    }
+  },
+  "Potato": {
+    "irrigated": {
+      "rabi": {
+        "n": 48,
+        "p": 24,
+        "k": 48,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.33, 0.33, 0.33],
+            "stages": ["Basal", "at 30 days", "at 50 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.35, 0.65],
+            "stages": ["Basal", "at 50 days"]
+          }
+        }
+      }
+    }
+  },
+  "Bajra": {
+    "irrigated": {
+      "kharif": {
+        "n": 20,
+        "p": 10,
+        "k": 10,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Korra": {
+    "irrigated": {
+      "kharif": {
+        "n": 16,
+        "p": 8,
+        "k": 8,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Variga": {
+    "irrigated": {
+      "kharif": {
+        "n": 18,
+        "p": 10,
+        "k": 10,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "Green Gram": {
+    "irrigated": {
+      "kharif": {
+        "n": 12,
+        "p": 20,
+        "k": 12,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    }
+  },
+  "Black Gram": {
+    "irrigated": {
+      "kharif": {
+        "n": 12,
+        "p": 20,
+        "k": 12,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    }
+  },
+  "Bengal Gram": {
+    "irrigated": {
+      "rabi": {
+        "n": 16,
+        "p": 24,
+        "k": 12,
+        "splits": {
+          "n": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          },
+          "k": {
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
+          }
+        }
+      }
+    }
+  },
+  "Saff Flower": {
+    "irrigated": {
+      "rabi": {
+        "n": 20,
+        "p": 12,
+        "k": 10,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    }
+  },
+  "American Varieties/Cotton": {
+    "irrigated": {
+      "kharif": {
+        "n": 60,
+        "p": 30,
+        "k": 30,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.33, 0.33, 0.33],
+            "stages": ["Basal", "at 45 days", "at 75 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 75 days"]
+          }
+        }
+      }
+    }
+  },
+  "Desi Varieties/Cotton": {
+    "irrigated": {
+      "kharif": {
+        "n": 50,
+        "p": 25,
+        "k": 25,
+        "splits": {
+          "n": {
+            "count": 3,
+            "ratios": [0.33, 0.33, 0.33],
+            "stages": ["Basal", "at 45 days", "at 75 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 75 days"]
+          }
+        }
+      }
+    }
+  }
+}
+
+

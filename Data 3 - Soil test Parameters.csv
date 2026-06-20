@@ -1,0 +1,33 @@
+,,,,,
+,,,,,
+,,,,,
+,For N ,,,N STATUS,PER ACRE
+IF ORGANIC CARBON IS BELOW  0.5,,,,LOW,Less than 113 Kg
+IF ORGANIC CARBON IS BELOW  0.5 TO 0.75,,,,MEDIUM,113 to 226 Kg
+IF ORGANIC CARBON IS MORE THAN 0.75,,,,HIGH,more than 226 Kg
+,,,,,
+,,,,,
+,,,,P2O5  STATUS,PER ACRE
+,,,,LOW,less than 10 Kg
+,,,,MEDIUM,10 to 24 Kg 
+,,,,HIGH,Above 24 Kg
+,,,,,
+,,,,,
+,,,,K2O  STATUS,PER ACRE
+,,,,LOW,less than  58 Kg
+,,,,MEDIUM,59 to 138 Kg
+,,,,HIGH,Above 138 Kg 
+,,,,,
+,,,,Available Sulphur,
+,,,,LOW,0-10 ppm
+,,,,MEDIUM,10 to 15 ppm
+,,,,HIGH,Above 15 ppm
+,,,,,
+,,,,pH,
+,,,,Strongly acidic,below 5.5
+,,,,Medium acidic,5.6 to 6.0
+,,,,Slightly acidic,6.1 to 6.5
+,,,,Neutral,6.6 to 7.3
+,,,,Slightly alkaline,7.4 to 7.8
+,,,,Moderately alkaline,7.9 to 8.4
+,,,,Highly alkaline,8.5 to 14

@@ -1,0 +1,119 @@
+{
+  "nitrogen": {
+    "basedOn": "organicCarbon",
+    "thresholds": {
+      "low": {"ocMax": 0.5, "kgPerAcre": "Less than 113 Kg"},
+      "medium": {"ocMin": 0.5, "ocMax": 0.75, "kgPerAcre": "113 to 226 Kg"},
+      "high": {"ocMin": 0.75, "kgPerAcre": "more than 226 Kg"}
+    },
+    "directThresholds": {
+      "low": 113,
+      "medium": 226
+    }
+  },
+  "phosphorus": {
+    "thresholds": {
+      "low": {"max": 10, "kgPerAcre": "less than 10 Kg"},
+      "medium": {"min": 10, "max": 24, "kgPerAcre": "10 to 24 Kg"},
+      "high": {"min": 24, "kgPerAcre": "Above 24 Kg"}
+    }
+  },
+  "potassium": {
+    "thresholds": {
+      "low": {"max": 58, "kgPerAcre": "less than 58 Kg"},
+      "medium": {"min": 59, "max": 138, "kgPerAcre": "59 to 138 Kg"},
+      "high": {"min": 138, "kgPerAcre": "Above 138 Kg"}
+    }
+  },
+  "sulfur": {
+    "thresholds": {
+      "low": {"max": 10, "ppm": "0-10 ppm"},
+      "medium": {"min": 10, "max": 15, "ppm": "10 to 15 ppm"},
+      "high": {"min": 15, "ppm": "Above 15 ppm"}
+    }
+  },
+  "ph": {
+    "thresholds": {
+      "stronglyAcidic": {"max": 5.5},
+      "mediumAcidic": {"min": 5.6, "max": 6.0},
+      "slightlyAcidic": {"min": 6.1, "max": 6.5},
+      "neutral": {"min": 6.6, "max": 7.3},
+      "slightlyAlkaline": {"min": 7.4, "max": 7.8},
+      "moderatelyAlkaline": {"min": 7.9, "max": 8.4},
+      "highlyAlkaline": {"min": 8.5, "max": 14}
+    }
+  },
+  "ec": {
+    "thresholds": {
+      "low": {"max": 0.5, "dS/m": "0-0.5 dS/m"},
+      "medium": {"min": 0.5, "max": 2.0, "dS/m": "0.5-2.0 dS/m"},
+      "high": {"min": 2.0, "dS/m": "Above 2.0 dS/m"}
+    }
+  },
+  "calcium": {
+    "unit": "cmol/kg",
+    "thresholds": {
+      "deficiency": {"max": 2.0, "cmolPerKg": "less than 2.0 cmol/kg"},
+      "sufficiency": {"min": 2.0, "cmolPerKg": "2.0 cmol/kg and above"}
+    }
+  },
+  "magnesium": {
+    "unit": "cmol/kg",
+    "thresholds": {
+      "deficiency": {"max": 1.0, "cmolPerKg": "less than 1.0 cmol/kg"},
+      "sufficiency": {"min": 1.0, "cmolPerKg": "1.0 cmol/kg and above"}
+    }
+  },
+  "zinc": {
+    "unit": "ppm",
+    "thresholds": {
+      "deficiency": {"max": 1.5, "ppm": "less than 1.5 ppm"},
+      "sufficiency": {"min": 1.5, "ppm": "1.5 ppm and above"}
+    }
+  },
+  "boron": {
+    "unit": "ppm",
+    "thresholds": {
+      "deficiency": {"max": 0.5, "ppm": "less than 0.5 ppm"},
+      "sufficiency": {"min": 0.5, "ppm": "0.5 ppm and above"}
+    }
+  },
+  "manganese": {
+    "unit": "ppm",
+    "thresholds": {
+      "deficiency": {"max": 5.0, "ppm": "less than 5.0 ppm"},
+      "sufficiency": {"min": 5.0, "ppm": "5.0 ppm and above"}
+    }
+  },
+  "iron": {
+    "unit": "ppm",
+    "thresholds": {
+      "deficiency": {"max": 10.0, "ppm": "less than 10.0 ppm"},
+      "sufficiency": {"min": 10.0, "ppm": "10.0 ppm and above"}
+    }
+  },
+  "copper": {
+    "unit": "ppm",
+    "thresholds": {
+      "deficiency": {"max": 0.3, "ppm": "less than 0.3 ppm"},
+      "sufficiency": {"min": 0.3, "ppm": "0.3 ppm and above"}
+    }
+  },
+  "molybdenum": {
+    "unit": "ppm",
+    "thresholds": {
+      "deficiency": {"max": 0.15, "ppm": "less than 0.15 ppm"},
+      "sufficiency": {"min": 0.15, "ppm": "0.15 ppm and above"}
+    }
+  },
+  "chlorine": {
+    "unit": "ppm",
+    "thresholds": {
+      "deficiency": {"max": 20, "ppm": "less than 20 ppm"},
+      "sufficiency": {"min": 20, "ppm": "20 ppm and above"}
+    }
+  }
+}
+
+
+

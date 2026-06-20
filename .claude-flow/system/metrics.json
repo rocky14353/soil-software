@@ -1,0 +1,25 @@
+{
+  "startTime": "2026-05-18T23:44:07.731Z",
+  "lastCheck": "2026-05-18T23:44:07.771Z",
+  "uptime": 0,
+  "health": 0.8,
+  "cpu": 0,
+  "memory": {
+    "used": 14315,
+    "total": 15637
+  },
+  "agents": {
+    "active": 0,
+    "total": 0
+  },
+  "tasks": {
+    "pending": 0,
+    "completed": 0,
+    "failed": 0
+  },
+  "requests": {
+    "total": 0,
+    "success": 0,
+    "errors": 0
+  }
+}

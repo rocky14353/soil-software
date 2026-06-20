@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Regression Test Output</title>
+    <script src="script.js"></script>
+</head>
+<body>
+    <h1>Regression Test: SOUTH TELENGANA Case</h1>
+    <pre id="output"></pre>
+    <script>
+        const payload = {
+            "crop": "Paddy lowland",
+            "organicCarbon": 0.6,
+            "nitrogen": 150,
+            "phosphorus": 9,
+            "potassium": 50,
+            "season": "Rabi",
+            "fieldType": "Irrigated",
+            "location": "SOUTH TELENGANA",
+            "soilType": "Medium",
+            "sulfur": 9,
+            "ph": 7.5,
+            "ec": 0.6,
+            "calcium": 20,
+            "magnesium": 50,
+            "zinc": 5,
+            "boron": 0.5,
+            "manganese": 20,
+            "iron": 50,
+            "copper": 20,
+            "molybdenum": 0.5,
+            "chlorine": 9.8,
+            "gromorCombination": "Auto-select based on Location",
+            "preferences": {
+                "28-28-0": "Optional",
+                "14-35-14": "Optional",
+                "20-20-0": "Optional",
+                "10-26-26": "Optional",
+                "16-20-0": "Optional",
+                "Urea": "Optional",
+                "MOP": "Optional",
+                "SOP": "Optional",
+                "SSP": "Optional"
+            }
+        };
+
+        try {
+            const result = calculateRecommendations(payload);
+            let output = '=== STAGE-WISE OUTPUT ===\n\n';
+            output += `Expected Targets: N=48, P=32, K=21\n`;
+            output += `Basal: N=16, P=22.4, K=10.5\n`;
+            output += `Tillering: N=16, P=9.6, K=0\n`;
+            output += `Panicle: N=16, P=0, K=10.5\n\n`;
+            
+            result.stageRecommendations.forEach((stage, idx) => {
+                const n = stage.fertilizers.reduce((s, f) => s + (f.nContributed || 0), 0);
+                const p = stage.fertilizers.reduce((s, f) => s + (f.pContributed || 0), 0);
+                const k = stage.fertilizers.reduce((s, f) => s + (f.kContributed || 0), 0);
+                
+                output += `${stage.stage}:\n`;
+                output += `  N: ${n.toFixed(2)} kg (expected: ${idx === 0 ? '16' : idx === 1 ? '16' : '16'})\n`;
+                output += `  P: ${p.toFixed(2)} kg (expected: ${idx === 0 ? '22.4' : idx === 1 ? '9.6' : '0'})\n`;
+                output += `  K: ${k.toFixed(2)} kg (expected: ${idx === 0 ? '10.5' : idx === 1 ? '0' : '10.5'})\n`;
+                output += `  Fertilizers:\n`;
+                stage.fertilizers.forEach(f => {
+                    output += `    - ${f.name}: ${f.kgs.toFixed(2)} kg (N:${(f.nContributed || 0).toFixed(2)}, P:${(f.pContributed || 0).toFixed(2)}, K:${(f.kContributed || 0).toFixed(2)})\n`;
+                });
+                output += '\n';
+            });
+            
+            document.getElementById('output').textContent = output;
+        } catch (e) {
+            document.getElementById('output').textContent = 'Error: ' + e.message + '\n' + e.stack;
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+

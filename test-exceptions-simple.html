@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Exceptions Edge Cases Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .test { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 5px solid #2196F3; }
+        .pass { border-left-color: #4CAF50; }
+        .fail { border-left-color: #f44336; }
+        button { background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        .summary { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Exceptions Edge Cases Test</h1>
+    <button onclick="runTests()">Run All Tests</button>
+    <div id="results"></div>
+
+    <script src="script.js"></script>
+    <script>
+        function runTests() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Running tests...</p>';
+            
+            const tests = [];
+            
+            // Test 1: N Classification with OC fallback
+            try {
+                const formData1 = {
+                    crop: 'Paddy lowland',
+                    organicCarbon: 0.4,
+                    nitrogen: null, // Not provided - will use OC
+                    phosphorus: 9,
+                    potassium: 70,
+                    season: 'Rabi',
+                    fieldType: 'Irrigated',
+                    location: 'SOUTH TELENGANA',
+                    sulfur: 15,
+                    ph: 7.5,
+                    gromorCombination: 'Auto-select based on Location',
+                    pref_28_28_0: 'Optional',
+                    pref_14_35_14: 'Optional',
+                    pref_20_20_0: 'Optional',
+                    pref_10_26_26: 'Optional',
+                    pref_16_20_0: 'Optional',
+                    pref_Urea: 'Optional',
+                    pref_MOP: 'Optional',
+                    pref_SOP: 'Optional',
+                    pref_SSP: 'Optional'
+                };
+                const result1 = calculateRecommendations(formData1);
+                const nStatus1 = result1.nutrientAnalysis?.nitrogen?.status;
+                tests.push({
+                    name: 'Test 1: N Classification (OC Fallback)',
+                    pass: nStatus1 === 'low',
+                    details: `N Status: ${nStatus1} (Expected: low, OC=0.4% < 0.5%)`,
+                    result: result1
+                });
+            } catch (e) {
+                tests.push({ name: 'Test 1', pass: false, error: e.message });
+            }
+
+            // Test 2: Paddy N Equal Splits (33.33% each)
+            try {
+                const formData2 = {
+                    crop: 'Paddy lowland',
+                    organicCarbon: 0.4,
+                    nitrogen: 150,
+                    phosphorus: 9,
+                    potassium: 70,
+                    season: 'Rabi',
+                    fieldType: 'Irrigated',
+                    location: 'SOUTH TELENGANA',
+                    sulfur: 15,
+                    ph: 7.5,
+                    gromorCombination: 'Auto-select based on Location',
+                    pref_28_28_0: 'Optional',
+                    pref_14_35_14: 'Optional',
+                    pref_20_20_0: 'Optional',
+                    pref_10_26_26: 'Optional',
+                    pref_16_20_0: 'Optional',
+                    pref_Urea: 'Optional',
+                    pref_MOP: 'Optional',
+                    pref_SOP: 'Optional',
+                    pref_SSP: 'Optional'
+                };
+                const result2 = calculateRecommendations(formData2);
+                const expectedNPK = result2.expectedNPKPerStage;
+                let nSplitEqual = false;
+                if (expectedNPK && expectedNPK.length === 3) {
+                    const totalN = expectedNPK.reduce((s, x) => s + (x.expectedN || 0), 0);
+                    const p1 = totalN > 0 ? (expectedNPK[0].expectedN / totalN) * 100 : 0;
+                    const p2 = totalN > 0 ? (expectedNPK[1].expectedN / totalN) * 100 : 0;
+                    const p3 = totalN > 0 ? (expectedNPK[2].expectedN / totalN) * 100 : 0;
+                    nSplitEqual = Math.abs(p1 - 33.33) < 5 && Math.abs(p2 - 33.33) < 5 && Math.abs(p3 - 33.33) < 5;
+                }
+                tests.push({
+                    name: 'Test 2: Paddy N Equal Splits (33.33% each)',
+                    pass: nSplitEqual,
+                    details: `N Splits: ${expectedNPK?.map(s => ((s.expectedN / expectedNPK.reduce((sum, x) => sum + (x.expectedN || 0), 0)) * 100).toFixed(1) + '%').join(' / ') || 'N/A'}`,
+                    result: result2
+                });
+            } catch (e) {
+                tests.push({ name: 'Test 2', pass: false, error: e.message });
+            }
+
+            // Test 3: Paddy P Split 70/30
+            try {
+                const formData3 = {
+                    crop: 'Paddy lowland',
+                    organicCarbon: 0.4,
+                    nitrogen: 150,
+                    phosphorus: 9,
+                    potassium: 70,
+                    season: 'Rabi',
+                    fieldType: 'Irrigated',
+                    location: 'SOUTH TELENGANA',
+                    sulfur: 15,
+                    ph: 7.5,
+                    gromorCombination: 'Auto-select based on Location'
+                };
+                const result3 = calculateRecommendations(formData3);
+                const expectedNPK = result3.expectedNPKPerStage;
+                let pSplit7030 = false;
+                if (expectedNPK && expectedNPK.length >= 2) {
+                    const totalP = expectedNPK.reduce((s, x) => s + (x.expectedP || 0), 0);
+                    const basalP = expectedNPK[0].expectedP || 0;
+                    const stage2P = expectedNPK[1].expectedP || 0;
+                    const basalPercent = totalP > 0 ? (basalP / totalP) * 100 : 0;
+                    const stage2Percent = totalP > 0 ? (stage2P / totalP) * 100 : 0;
+                    pSplit7030 = Math.abs(basalPercent - 70) < 5 && Math.abs(stage2Percent - 30) < 5;
+                }
+                tests.push({
+                    name: 'Test 3: Paddy P Split 70/30',
+                    pass: pSplit7030,
+                    details: `P Split: Basal ${(expectedNPK?.[0]?.expectedP || 0).toFixed(1)}kg, Stage 2 ${(expectedNPK?.[1]?.expectedP || 0).toFixed(1)}kg`,
+                    result: result3
+                });
+            } catch (e) {
+                tests.push({ name: 'Test 3', pass: false, error: e.message });
+            }
+
+            // Test 4: SSP Not at Stage 2
+            try {
+                const formData4 = {
+                    crop: 'Paddy lowland',
+                    organicCarbon: 0.4,
+                    nitrogen: 150,
+                    phosphorus: 9,
+                    potassium: 70,
+                    season: 'Rabi',
+                    fieldType: 'Irrigated',
+                    location: 'SOUTH TELENGANA',
+                    sulfur: 15,
+                    ph: 7.5,
+                    gromorCombination: 'Auto-select based on Location'
+                };
+                const result4 = calculateRecommendations(formData4);
+                let sspAtStage2 = false;
+                result4.recommendations?.forEach((stage, idx) => {
+                    if (idx > 0) { // Not basal
+                        stage.fertilizers?.forEach(f => {
+                            if (f.name === 'SSP') sspAtStage2 = true;
+                        });
+                    }
+                });
+                tests.push({
+                    name: 'Test 4: SSP Not at Stage 2',
+                    pass: !sspAtStage2,
+                    details: sspAtStage2 ? '❌ SSP found at stage 2' : '✅ SSP only at basal or not used',
+                    result: result4
+                });
+            } catch (e) {
+                tests.push({ name: 'Test 4', pass: false, error: e.message });
+            }
+
+            // Test 5: Paddy K Split 50/50
+            try {
+                const formData5 = {
+                    crop: 'Paddy lowland',
+                    organicCarbon: 0.4,
+                    nitrogen: 150,
+                    phosphorus: 9,
+                    potassium: 70,
+                    season: 'Rabi',
+                    fieldType: 'Irrigated',
+                    location: 'SOUTH TELENGANA',
+                    sulfur: 15,
+                    ph: 7.5,
+                    gromorCombination: 'Auto-select based on Location'
+                };
+                const result5 = calculateRecommendations(formData5);
+                const expectedNPK = result5.expectedNPKPerStage;
+                let kSplit5050 = false;
+                if (expectedNPK) {
+                    const totalK = expectedNPK.reduce((s, x) => s + (x.expectedK || 0), 0);
+                    const basalK = expectedNPK[0].expectedK || 0;
+                    const panicleK = expectedNPK[2]?.expectedK || 0;
+                    const basalPercent = totalK > 0 ? (basalK / totalK) * 100 : 0;
+                    const paniclePercent = totalK > 0 ? (panicleK / totalK) * 100 : 0;
+                    kSplit5050 = Math.abs(basalPercent - 50) < 5 && Math.abs(paniclePercent - 50) < 5;
+                }
+                tests.push({
+                    name: 'Test 5: Paddy K Split 50/50',
+                    pass: kSplit5050,
+                    details: `K Split: Basal ${(expectedNPK?.[0]?.expectedK || 0).toFixed(1)}kg, Panicle ${(expectedNPK?.[2]?.expectedK || 0).toFixed(1)}kg`,
+                    result: result5
+                });
+            } catch (e) {
+                tests.push({ name: 'Test 5', pass: false, error: e.message });
+            }
+
+            // Display results
+            let html = '<div class="summary"><h2>Test Results</h2>';
+            const passed = tests.filter(t => t.pass).length;
+            html += `<p><strong>Passed:</strong> ${passed}/${tests.length}</p></div>`;
+            
+            tests.forEach(test => {
+                html += `<div class="test ${test.pass ? 'pass' : 'fail'}">
+                    <h3>${test.name} ${test.pass ? '✅' : '❌'}</h3>
+                    <p>${test.details || test.error || 'No details'}</p>
+                    <details><summary>View Full Result</summary><pre>${JSON.stringify(test.result, null, 2)}</pre></details>
+                </div>`;
+            });
+            
+            results.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
+

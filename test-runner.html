@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stage Constraint Tests</title>
+</head>
+<body>
+    <h1>Stage Constraint Tests</h1>
+    <div id="results"></div>
+    
+    <script src="data/crops.json"></script>
+    <script src="data/fertilizer-conversion.json"></script>
+    <script src="data/location-crop-recommendations-full.json"></script>
+    <script src="script.js"></script>
+    <script src="test-stage-constraints-integration.js"></script>
+    <script>
+        window.addEventListener('load', function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h2>Running tests...</h2>';
+            
+            try {
+                const testResults = runAllTests();
+                resultsDiv.innerHTML = `
+                    <h2>Test Results</h2>
+                    <p>Passed: ${testResults.passed}/${testResults.total}</p>
+                    <p>Failed: ${testResults.failed}/${testResults.total}</p>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <h2>Test Error</h2>
+                    <pre>${error.message}\n${error.stack}</pre>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+

@@ -1,0 +1,246 @@
+Soil Testing Software Training
+22nd March 2007
+
+Old Software – Disadvantages
+• Single product recommendation
+• Only N,P,K and pH, EC and OC are
+analysed
+• Only in English
+• Reports have to come from Vizag lab and
+translated in regional language
+
+New software- Features
+• Web enabled software
+• Single and multi product recommendation
+• Macro and Micro nutrients
+recommendation including Sulphur and B
+• Lot of MIS reports can be generated
+
+New software- Features
+• Reports can be generated in English and
+regional languages
+• Reports can be generated at respective
+branches
+• Very user friendly – selection from drop
+down menu-type
+
+New software
+• Specific information sheet duly filled in must go
+along with soil sample
+• After Sample analysis- data will be keyed in by
+LAB staff
+• Branch will receive the (computer generated )
+analysed sample numbers on daily basis
+• Concerned AM or MO generate the farmer
+recommendation sheet (using pre printed
+stationary) in Regional language
+• Report will be handed over to concerned farmer
+immediately
+
+Information sheet- Front side
+
+Information sheet- Back side
+
+SOIL INFORMATION SHET- ENGLISH
+Coromandel fertilisers Ltd
+
+Soil sample information sheet
+S.No
+1
+
+Farmer name
+
+2
+
+Father name
+
+3
+
+state
+
+4
+
+district
+
+5
+
+Mandal/Block
+
+6
+
+village
+
+7
+
+Pin code
+
+8
+
+phone number(land line)
+
+9
+
+mobile no
+
+10
+
+E-mail
+
+11
+
+Land(in acres)
+
+12
+
+Survey no/Field name
+
+13
+
+branch name
+
+14
+
+Previous year crop details
+crop
+
+season
+
+yield Qt/acre
+
+15 Select the crop for which fertiliser recommendation required
+Crop
+
+prefered gromor product
+
+16 For the sample crop last dose of fertilisers applied- details
+Crop
+Year
+month
+fertiliser
+Company Brand
+
+17 Last year fertiliser application details during entire crop period
+Season
+Year
+Crop
+Time of
+fertiliser
+application
+
+18 Land type- Flat or sloppy
+19 Soil type- Sandy or Loamy or Clay
+20 drainage facility- Good or medium or low
+21 Special conditions of soil- Ex. Hard pan etc.
+2 Source of irrigation
+22 a) Irrigation facility
+22 b) Source of irrigation
+23 sample serial no
+24 sample collection date
+25 Soil sample collected by
+26 Rank of the collected person
+
+Dose kgs/acre
+
+Company Brand
+
+Dose kgs/acre
+
+Farmer recommendation- front
+
+Farmer recommendation- back
+
+Soil sample collection schedule
+BRANCH:
+VAN - 1
+PERIOD
+APRIL 1st week
+APRIL 2nd week
+APRIL 3rd week
+APRIL 4th week
+
+MANDAL
+
+DISTRICT
+
+NUMBER
+
+MANDAL
+
+DISTRICT
+
+NUMBER
+
+DISTRICT
+
+NUMBER
+
+JUNE 4th week
+
+VAN - 2
+PERIOD
+APRIL 1st week
+APRIL 2nd week
+APRIL 3rd week
+APRIL 4th week
+
+JUNE 4th week
+
+SAMPLES FOR PLANT
+PERIOD
+APRIL 1st week
+APRIL 2nd week
+APRIL 3rd week
+APRIL 4th week
+
+JUNE 4th week
+
+MANDAL
+
+Leaf sample Collection Schedule
+LEAF SAMPLES FOR PLANT
+PERIOD
+APRIL 3rd week
+APRIL 4th week
+
+JUNE 4th week
+
+MANDAL
+
+DISTRICT
+
+NUMBER
+
+Check List for Soil Analysis in Van
+• Chemical Solutions
+• pH Buffers- Expiry
+• Instruments calibration
+• If necessary call ELICO Engineer
+• Filter papers & other chemicals
+• Soil information sheets
+
+Check list for plant samples
+• Proper filling of information sheet
+• Tick marking the required gromor grade or
+combination of grades
+• Required nutrient analysis- NPKS or NPKS +
+Zn,B
+• LR number, number of samples, transport name
+shouldbe informed to Dr. Nilkamal and copy to
+HO
+• In a single bag not more than 50 soil samples
+• If leaf samples not more than 50 samples at a
+time.
+
+Effective Utilization of Soil & leaf
+analysis data
+• Purpose
+• Identify target crop
+• Identify target Village
+• Focus product recommendation
+• Cross check randomly the adoption rate
+• Making use of MIS reports to promote the
+specific products, in specific areas
+
+Thank you
+
+

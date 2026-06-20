@@ -1,0 +1,83 @@
+                              Software Requirements
+
+For Soil analysis
+
+Type of Tests
+Soil type- Light , Medium and heavy
+PH
+EC
+OC
+N
+P
+K
+S
+Ca
+Mg
+Zn
+Boron
+Mn
+Fe
+Cu
+Mo
+Cl
+
+For all the above tests- Low, Medium and High with values in brackets
+NPK,Ca,Mg,S units in Kg/acre, other micronutrients mg/Kg soil
+
+For Leaf Analysis
+N
+P
+K
+S
+Ca
+Mg
+Zn
+Boron
+Mn
+Fe
+Cu
+Mo
+Cl
+
+NPK,Ca,Mg,S- % as unit- Deficient, Sufficient and High with values in brackets.
+For micro nutrients – Unit as microns/Gram
+Regarding fertilizer Recommendations
+
+1.District wise, crop wise and season wise separate recommendations for each district
+2.Gromor recommendation with different combinations
+
+   a) Each Gromor complex recommendation with Urea and MOP
+   b) Different combinations
+          1. 28-28-0 as basal + 20-20-0 as 1st top dressing and recommended N & K
+             balance as Urea and MOP with 1 st, 2nd or final dose
+          2. 14-35-14 + 20-20-0
+          3. 14-35-14 + 28-28-0
+          4. 28-28-0 + 10-26-26
+          5. 28-28-0 + 16-20-0
+          6. 14-35-14 + 16-20-0
+
+          Because we are promoting different grade for the same crop depend up
+          on the branch and district. Software should provide recommendation
+          based on the selected combination.
+
+          Two types of Recommendations are required
+
+          1.Soil analysis and leaf analysis based
+          2. Soil analysis + target yield based( for future- should be flexible)
+
+          Master should have District wise , Crop wise and season wise NPK
+          recommendations.
+
+          Regarding reports
+          1. Basic soil and leaf information filling the blanks type- like Low( .50)
+          2. Recommendations crop wise, stage wise( number of days or basal , 1 st
+              top etc) and Dose in Kgs (Nearest to Full bag, half bag and 1/4th bag).
+          3.Since number of days differs from crop to crop – it should print total
+          information on the sheet
+
+          3. For PH and EC for problematic soils- Recommendation should be
+             based on the range and total matter should be printed on the sheet.
+          4. Provision for other micronutrient recommendations depend on the
+             deficiency.
+          5. Provision for other special recommendations
+

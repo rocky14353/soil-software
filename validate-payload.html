@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Validate Payload</title>
+    <style>
+        body { font-family: 'Courier New', monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { background: #252526; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #007acc; }
+        .success { border-left-color: #4ec9b0; }
+        .error { border-left-color: #f48771; }
+        .warning { border-left-color: #dcdcaa; }
+        pre { background: #1e1e1e; padding: 15px; overflow-x: auto; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #3e3e42; }
+        th { background: #2d2d30; color: #4ec9b0; }
+        .pass { color: #4ec9b0; }
+        .fail { color: #f48771; }
+        h1 { color: #4ec9b0; }
+        h2 { color: #dcdcaa; }
+        h3 { color: #569cd6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Payload Validation Test</h1>
+        <div id="output"></div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Test Payload
+        const testPayload = {
+            crop: "Paddy lowland",
+            organicCarbon: 0.6,
+            nitrogen: 150,
+            phosphorus: 9,
+            potassium: 50,
+            season: "Rabi",
+            fieldType: "Irrigated",
+            location: "SOUTH TELENGANA",
+            sulfur: 9,
+            ph: 7.5,
+            soilType: "Medium",
+            ec: 0.6,
+            calcium: 20,
+            magnesium: 50,
+            zinc: 5,
+            boron: 0.5,
+            manganese: 20,
+            iron: 50,
+            copper: 20,
+            molybdenum: 0.5,
+            chlorine: 10,
+            gromorCombination: "Auto-select based on Location",
+            pref_28_28_0: "Optional",
+            pref_14_35_14: "Optional",
+            pref_20_20_0: "Optional",
+            pref_10_26_26: "Optional",
+            pref_16_20_0: "Optional",
+            pref_Urea: "Optional",
+            pref_MOP: "Optional",
+            pref_SOP: "Optional",
+            pref_SSP: "Optional"
+        };
+
+        function validatePayload() {
+            const output = document.getElementById('output');
+            let html = '';
+
+            try {
+                html += '<div class="section"><h2>📋 Input Payload</h2><pre>' + JSON.stringify(testPayload, null, 2) + '</pre></div>';
+
+                console.log('Testing payload...', testPayload);
+                const result = calculateRecommendations(testPayload);
+
+                // Extract key data
+                const recommendedN = result.recommendedNPK?.n || 0;
+                const recommendedP = result.recommendedNPK?.p || 0;
+                const recommendedK = result.recommendedNPK?.k || 0;
+
+                const deliveredN = result.deliveredNPK?.n || 0;
+                const deliveredP = result.deliveredNPK?.p || 0;
+                const deliveredK = result.deliveredNPK?.k || 0;
+
+                const tolerance = 0.12; // 12%
+                const minRequiredN = recommendedN * (1 - tolerance);
+                const minRequiredP = recommendedP * (1 - tolerance);
+                const minRequiredK = recommendedK * (1 - tolerance);
+
+                const nPass = deliveredN >= minRequiredN;
+                const pPass = deliveredP >= minRequiredP;
+                const kPass = deliveredK >= minRequiredK;
+                const allPass = nPass && pPass && kPass;
+
+                // Calculate deficits
+                const deficitN = Math.max(0, minRequiredN - deliveredN);
+                const deficitP = Math.max(0, minRequiredP - deliveredP);
+                const deficitK = Math.max(0, minRequiredK - deliveredK);
+
+                // Calculate excess
+                const excessN = Math.max(0, deliveredN - recommendedN);
+                const excessP = Math.max(0, deliveredP - recommendedP);
+                const excessK = Math.max(0, deliveredK - recommendedK);
+
+                const excessNPercent = recommendedN > 0 ? (excessN / recommendedN) * 100 : 0;
+                const excessPPercent = recommendedP > 0 ? (excessP / recommendedP) * 100 : 0;
+                const excessKPercent = recommendedK > 0 ? (excessK / recommendedK) * 100 : 0;
+
+                html += `
+                    <div class="section ${allPass ? 'success' : 'error'}">
+                        <h2>${allPass ? '✅ VALIDATION PASSED' : '❌ VALIDATION FAILED'}</h2>
+                        <p><strong>Location:</strong> ${result.location}</p>
+                        <p><strong>Crop:</strong> ${result.crop}</p>
+                        <p><strong>Season:</strong> ${result.season}</p>
+                        <p><strong>Combination:</strong> ${result.combination?.name || 'N/A'}</p>
+                    </div>
+
+                    <div class="section">
+                        <h3>📊 Nutrient Validation</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nutrient</th>
+                                    <th>Recommended</th>
+                                    <th>Delivered</th>
+                                    <th>Minimum (88%)</th>
+                                    <th>Deficit</th>
+                                    <th>Excess</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Nitrogen (N)</strong></td>
+                                    <td>${recommendedN.toFixed(2)} kg/acre</td>
+                                    <td>${deliveredN.toFixed(2)} kg/acre</td>
+                                    <td>${minRequiredN.toFixed(2)} kg/acre</td>
+                                    <td>${deficitN.toFixed(2)} kg</td>
+                                    <td>${excessN.toFixed(2)} kg (${excessNPercent.toFixed(1)}%)</td>
+                                    <td class="${nPass ? 'pass' : 'fail'}">${nPass ? '✅ PASS' : '❌ FAIL'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Phosphorus (P)</strong></td>
+                                    <td>${recommendedP.toFixed(2)} kg/acre</td>
+                                    <td>${deliveredP.toFixed(2)} kg/acre</td>
+                                    <td>${minRequiredP.toFixed(2)} kg/acre</td>
+                                    <td>${deficitP.toFixed(2)} kg</td>
+                                    <td>${excessP.toFixed(2)} kg (${excessPPercent.toFixed(1)}%)</td>
+                                    <td class="${pPass ? 'pass' : 'fail'}">${pPass ? '✅ PASS' : '❌ FAIL'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Potassium (K)</strong></td>
+                                    <td>${recommendedK.toFixed(2)} kg/acre</td>
+                                    <td>${deliveredK.toFixed(2)} kg/acre</td>
+                                    <td>${minRequiredK.toFixed(2)} kg/acre</td>
+                                    <td>${deficitK.toFixed(2)} kg</td>
+                                    <td>${excessK.toFixed(2)} kg (${excessKPercent.toFixed(1)}%)</td>
+                                    <td class="${kPass ? 'pass' : 'fail'}">${kPass ? '✅ PASS' : '❌ FAIL'}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="section">
+                        <h3>🌾 Stage-wise Fertilizer Application</h3>
+                `;
+
+                if (result.recommendations && result.recommendations.length > 0) {
+                    result.recommendations.forEach((stage, idx) => {
+                        let stageN = 0, stageP = 0, stageK = 0;
+                        stage.fertilizers.forEach(f => {
+                            stageN += f.nContributed || 0;
+                            stageP += f.pContributed || 0;
+                            stageK += f.kContributed || 0;
+                        });
+
+                        html += `
+                            <div style="margin: 15px 0; padding: 15px; background: #1e1e1e; border-radius: 4px;">
+                                <h4 style="color: #569cd6;">Stage ${idx + 1}: ${stage.stage}</h4>
+                                <p><strong>N:</strong> ${stageN.toFixed(2)} kg | <strong>P:</strong> ${stageP.toFixed(2)} kg | <strong>K:</strong> ${stageK.toFixed(2)} kg</p>
+                                <ul>
+                        `;
+                        stage.fertilizers.forEach(f => {
+                            html += `<li>${f.name}: ${f.kgs.toFixed(2)} kgs (${(f.kgs/45).toFixed(2)} bag(s))</li>`;
+                        });
+                        html += `</ul></div>`;
+                    });
+                }
+
+                html += `</div>`;
+
+                // Show validation errors if any
+                if (result.validation && result.validation.errors && result.validation.errors.length > 0) {
+                    html += `
+                        <div class="section error">
+                            <h3>⚠️ Validation Errors</h3>
+                            <ul>
+                    `;
+                    result.validation.errors.forEach(err => {
+                        html += `<li>${err}</li>`;
+                    });
+                    html += `</ul></div>`;
+                }
+
+                // Show full response
+                html += `
+                    <div class="section">
+                        <h3>📄 Full Response</h3>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    </div>
+                `;
+
+                output.innerHTML = html;
+
+                // Console log for debugging
+                console.log('Validation Result:', {
+                    allPass,
+                    n: { recommended: recommendedN, delivered: deliveredN, min: minRequiredN, pass: nPass },
+                    p: { recommended: recommendedP, delivered: deliveredP, min: minRequiredP, pass: pPass },
+                    k: { recommended: recommendedK, delivered: deliveredK, min: minRequiredK, pass: kPass }
+                });
+
+            } catch (error) {
+                html += `
+                    <div class="section error">
+                        <h2>❌ ERROR</h2>
+                        <p><strong>Error Message:</strong></p>
+                        <pre>${error.message}</pre>
+                        <p><strong>Stack Trace:</strong></p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+                output.innerHTML = html;
+                console.error('Error:', error);
+            }
+        }
+
+        // Run validation on page load
+        window.addEventListener('load', validatePayload);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+

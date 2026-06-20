@@ -1,0 +1,81 @@
+{
+  "locationPreferences": {
+    "GODAVARI DELTA": {
+      "preferredCombination": 1,
+      "description": "28-28-0 (basal) + 20-20-0 (1st top) + Urea + MOP"
+    },
+    "KRI-DELTA & L soils": {
+      "preferredCombination": 2,
+      "description": "14-35-14 + 20-20-0"
+    },
+    "NORTH COASTAL": {
+      "preferredCombination": 3,
+      "description": "14-35-14 + 28-28-0"
+    },
+    "SOUTH MANDL": {
+      "preferredCombination": 4,
+      "description": "28-28-0 + 10-26-26"
+    },
+    "NORTH TELENGANA": {
+      "preferredCombination": 5,
+      "description": "28-28-0 + 16-20-0"
+    },
+    "SOUTH TELENGANA": {
+      "preferredCombination": 6,
+      "description": "14-35-14 + 16-20-0"
+    },
+    "LOW RAINFALL AREA": {
+      "preferredCombination": 1,
+      "description": "28-28-0 (basal) + 20-20-0 (1st top) + Urea + MOP"
+    },
+    "High altitude Area": {
+      "preferredCombination": 2,
+      "description": "14-35-14 + 20-20-0"
+    }
+  },
+  "combinations": {
+    "1": {
+      "name": "28-28-0 (basal) + 20-20-0 (1st top) + Urea + MOP",
+      "products": ["28-28-0", "20-20-0-13", "Urea", "MOP"],
+      "description": "Basal application with 28-28-0, first top dressing with 20-20-0, balance with Urea and MOP"
+    },
+    "2": {
+      "name": "14-35-14 + 20-20-0",
+      "products": ["14-35-14", "20-20-0-13", "Urea", "MOP"],
+      "description": "High phosphate combination with 14-35-14 and 20-20-0"
+    },
+    "3": {
+      "name": "14-35-14 + 28-28-0",
+      "products": ["14-35-14", "28-28-0", "Urea", "MOP"],
+      "description": "Balanced NPK with 14-35-14 and 28-28-0"
+    },
+    "4": {
+      "name": "28-28-0 + 10-26-26",
+      "products": ["28-28-0", "10-26-26", "Urea", "MOP"],
+      "description": "High potassium combination with 28-28-0 and 10-26-26"
+    },
+    "5": {
+      "name": "28-28-0 + 16-20-0",
+      "products": ["28-28-0", "16-20-0-13", "Urea", "MOP"],
+      "description": "Sulfur-rich combination with 28-28-0 and 16-20-0"
+    },
+    "6": {
+      "name": "14-35-14 + 16-20-0",
+      "products": ["14-35-14", "16-20-0-13", "Urea", "MOP"],
+      "description": "High phosphate with sulfur using 14-35-14 and 16-20-0"
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

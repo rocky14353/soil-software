@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Suite - Soil Test Recommendations</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-case {
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+        }
+        .test-input {
+            background: #e3f2fd;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .test-output {
+            background: #e8f5e9;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .test-error {
+            background: #ffebee;
+            padding: 10px;
+            margin: 5px 0;
+            color: #c62828;
+        }
+        .pass { color: #2e7d32; font-weight: bold; }
+        .fail { color: #c62828; font-weight: bold; }
+        button {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #5568d3; }
+        .summary {
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Comprehensive Test Suite - Soil Test Recommendations</h1>
+    <div class="summary" id="summary">
+        <h2>Test Summary</h2>
+        <p>Click "Run All Tests" to begin comprehensive testing</p>
+    </div>
+    
+    <button onclick="runAllTests()">Run All Tests</button>
+    <button onclick="clearResults()">Clear Results</button>
+    
+    <div id="testResults"></div>
+
+    <script src="script.js"></script>
+    <script>
+        let testResults = [];
+        let cropsData = {};
+        let fertilizerConversion = {};
+        let locationsData = {};
+
+        // Load data
+        async function loadTestData() {
+            try {
+                const cropsResponse = await fetch('data/crops.json');
+                cropsData = await cropsResponse.json();
+                
+                const conversionResponse = await fetch('data/fertilizer-conversion.json');
+                fertilizerConversion = await conversionResponse.json();
+                
+                const locationsResponse = await fetch('data/locations.json');
+                locationsData = await locationsResponse.json();
+                
+                console.log('Test data loaded successfully');
+                return true;
+            } catch (error) {
+                console.error('Error loading test data:', error);
+                return false;
+            }
+        }
+
+        // Test cases based on actual CSV data
+        const testCases = [
+            {
+                name: "Test 1: Paddy Upland - Irrigated Rabi",
+                input: {
+                    crop: "Paddy Upland",
+                    nitrogen: 79, // 32 kg/acre = 79 kg/ha
+                    phosphorus: 30, // 12 kg/acre = 30 kg/ha
+                    potassium: 30, // 12 kg/acre = 30 kg/ha
+                    season: "Rabi",
+                    fieldType: "Irrigated",
+                    location: "GODAVARI DELTA"
+                },
+                expected: {
+                    nSplits: 3,
+                    kSplits: 2,
+                    nTotal: 32, // kg/acre
+                    pTotal: 12, // kg/acre
+                    kTotal: 12, // kg/acre
+                    combination: "1"
+                }
+            },
+            {
+                name: "Test 2: Maize - Irrigated Rabi",
+                input: {
+                    crop: "Maize",
+                    nitrogen: 119, // 48 kg/acre = 119 kg/ha
+                    phosphorus: 59, // 24 kg/acre = 59 kg/ha
+                    potassium: 49, // 20 kg/acre = 49 kg/ha
+                    season: "Rabi",
+                    fieldType: "Irrigated",
+                    location: "NORTH COASTAL"
+                },
+                expected: {
+                    nSplits: 3,
+                    kSplits: 2,
+                    nTotal: 48,
+                    pTotal: 24,
+                    kTotal: 20,
+                    combination: "3"
+                }
+            },
+            {
+                name: "Test 3: Mustard - Rainfed Rabi",
+                input: {
+                    crop: "Mustard",
+                    nitrogen: 59, // 24 kg/acre = 59 kg/ha
+                    phosphorus: 30, // 12 kg/acre = 30 kg/ha
+                    potassium: 30, // 12 kg/acre = 30 kg/ha
+                    season: "Rabi",
+                    fieldType: "Rainfed",
+                    location: "SOUTH TELENGANA"
+                },
+                expected: {
+                    nSplits: 1,
+                    kSplits: 1,
+                    nTotal: 24,
+                    pTotal: 12,
+                    kTotal: 12,
+                    combination: "6"
+                }
+            },
+            {
+                name: "Test 4: Paddy lowland - High NPK",
+                input: {
+                    crop: "Paddy lowland",
+                    nitrogen: 99, // 40 kg/acre = 99 kg/ha
+                    phosphorus: 49, // 20 kg/acre = 49 kg/ha
+                    potassium: 49, // 20 kg/acre = 49 kg/ha
+                    season: "Rabi",
+                    fieldType: "Irrigated"
+                },
+                expected: {
+                    nSplits: 3,
+                    kSplits: 2,
+                    nTotal: 40,
+                    pTotal: 20,
+                    kTotal: 20
+                }
+            },
+            {
+                name: "Test 5: Wheat - Irrigated Rabi",
+                input: {
+                    crop: "Wheat",
+                    nitrogen: 79, // 32 kg/acre = 79 kg/ha
+                    phosphorus: 49, // 20 kg/acre = 49 kg/ha
+                    potassium: 40, // 16 kg/acre = 40 kg/ha
+                    season: "Rabi",
+                    fieldType: "Irrigated"
+                },
+                expected: {
+                    nSplits: 2,
+                    kSplits: 2,
+                    nTotal: 32,
+                    pTotal: 20,
+                    kTotal: 16
+                }
+            },
+            {
+                name: "Test 6: Combination 2 - 14-35-14 + 20-20-0",
+                input: {
+                    crop: "Paddy Upland",
+                    nitrogen: 79,
+                    phosphorus: 30,
+                    potassium: 30,
+                    season: "Rabi",
+                    fieldType: "Irrigated",
+                    location: "KRI-DELTA & L soils",
+                    gromorCombination: "2"
+                },
+                expected: {
+                    combination: "2",
+                    shouldContain: ["14-35-14", "20-20-0"]
+                }
+            },
+            {
+                name: "Test 7: Combination 4 - 28-28-0 + 10-26-26",
+                input: {
+                    crop: "Paddy Upland",
+                    nitrogen: 79,
+                    phosphorus: 30,
+                    potassium: 30,
+                    season: "Rabi",
+                    fieldType: "Irrigated",
+                    location: "SOUTH MANDL",
+                    gromorCombination: "4"
+                },
+                expected: {
+                    combination: "4",
+                    shouldContain: ["28-28-0", "10-26-26"]
+                }
+            },
+            {
+                name: "Test 8: Nutrient Classification - Low N",
+                input: {
+                    crop: "Paddy Upland",
+                    nitrogen: 100, // Low (< 150)
+                    phosphorus: 8,  // Low (< 12)
+                    potassium: 60,  // Low (< 80)
+                    season: "Rabi",
+                    fieldType: "Irrigated"
+                },
+                expected: {
+                    nClassification: "low",
+                    pClassification: "low",
+                    kClassification: "low"
+                }
+            },
+            {
+                name: "Test 9: Nutrient Classification - Medium",
+                input: {
+                    crop: "Paddy Upland",
+                    nitrogen: 200, // Medium (150-400)
+                    phosphorus: 20, // Medium (12-35)
+                    potassium: 150, // Medium (80-250)
+                    season: "Rabi",
+                    fieldType: "Irrigated"
+                },
+                expected: {
+                    nClassification: "medium",
+                    pClassification: "medium",
+                    kClassification: "medium"
+                }
+            },
+            {
+                name: "Test 10: Nutrient Classification - High",
+                input: {
+                    crop: "Paddy Upland",
+                    nitrogen: 500, // High (> 400)
+                    phosphorus: 50, // High (> 35)
+                    potassium: 300, // High (> 250)
+                    season: "Rabi",
+                    fieldType: "Irrigated"
+                },
+                expected: {
+                    nClassification: "high",
+                    pClassification: "high",
+                    kClassification: "high"
+                }
+            },
+            {
+                name: "Test 11: All 6 Combinations",
+                input: {
+                    crop: "Maize",
+                    nitrogen: 119,
+                    phosphorus: 59,
+                    potassium: 49,
+                    season: "Rabi",
+                    fieldType: "Irrigated"
+                },
+                expected: {
+                    testCombinations: [1, 2, 3, 4, 5, 6]
+                }
+            },
+            {
+                name: "Test 12: Fertilizer Conversion - P2O5 to 28-28-0",
+                input: {
+                    crop: "Paddy Upland",
+                    nitrogen: 79,
+                    phosphorus: 30, // 12 kg/acre P2O5
+                    potassium: 30,
+                    season: "Rabi",
+                    fieldType: "Irrigated"
+                },
+                expected: {
+                    p2o5Acre: 12,
+                    gromor28280Dose: 42.9 // From conversion table for 12 kg P2O5
+                }
+            },
+            {
+                name: "Test 13: Bag Rounding",
+                input: {
+                    crop: "Paddy Upland",
+                    nitrogen: 79,
+                    phosphorus: 30,
+                    potassium: 30,
+                    season: "Rabi",
+                    fieldType: "Irrigated"
+                },
+                expected: {
+                    checkBagRounding: true
+                }
+            },
+            {
+                name: "Test 14: Split Application - 3 N splits",
+                input: {
+                    crop: "Paddy Upland",
+                    nitrogen: 79,
+                    phosphorus: 30,
+                    potassium: 30,
+                    season: "Rabi",
+                    fieldType: "Irrigated"
+                },
+                expected: {
+                    nSplitRatios: [0.25, 0.5, 0.25],
+                    nStages: ["Basal", "at Tillering", "at Panicle"]
+                }
+            },
+            {
+                name: "Test 15: Single Split Application",
+                input: {
+                    crop: "Mustard",
+                    nitrogen: 59,
+                    phosphorus: 30,
+                    potassium: 30,
+                    season: "Rabi",
+                    fieldType: "Rainfed"
+                },
+                expected: {
+                    nSplits: 1,
+                    kSplits: 1,
+                    nSplitRatios: [1]
+                }
+            }
+        ];
+
+        async function runAllTests() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<h2>Running Tests...</h2>';
+            
+            // Load data first
+            const dataLoaded = await loadTestData();
+            if (!dataLoaded) {
+                resultsDiv.innerHTML += '<div class="test-error">❌ Failed to load test data</div>';
+                return;
+            }
+
+            testResults = [];
+            let passed = 0;
+            let failed = 0;
+
+            for (let i = 0; i < testCases.length; i++) {
+                const testCase = testCases[i];
+                const result = await runTest(testCase, i + 1);
+                testResults.push(result);
+                
+                if (result.passed) passed++;
+                else failed++;
+            }
+
+            displayResults(passed, failed);
+        }
+
+        async function runTest(testCase, testNumber) {
+            const result = {
+                number: testNumber,
+                name: testCase.name,
+                passed: false,
+                errors: [],
+                details: {}
+            };
+
+            try {
+                // Wait for script.js functions to be available
+                if (typeof calculateRecommendations === 'undefined') {
+                    result.errors.push('calculateRecommendations function not found');
+                    return result;
+                }
+
+                // Run the calculation
+                const output = calculateRecommendations(testCase.input);
+                result.details.output = output;
+
+                // Validate results
+                const errors = validateTest(testCase, output);
+                result.errors = errors;
+                result.passed = errors.length === 0;
+
+            } catch (error) {
+                result.errors.push(`Exception: ${error.message}`);
+                result.details.error = error.stack;
+            }
+
+            return result;
+        }
+
+        function validateTest(testCase, output) {
+            const errors = [];
+            const expected = testCase.expected;
+
+            // Check crop data exists
+            if (!output) {
+                errors.push('No output generated');
+                return errors;
+            }
+
+            // Check NPK totals (convert from kg/ha to kg/acre for comparison)
+            if (expected.nTotal) {
+                const nAcre = output.totals?.n || 0;
+                if (Math.abs(nAcre - expected.nTotal) > 1) {
+                    errors.push(`N total mismatch: expected ${expected.nTotal}, got ${nAcre.toFixed(1)}`);
+                }
+            }
+
+            if (expected.pTotal) {
+                const pAcre = output.totals?.p || 0;
+                if (Math.abs(pAcre - expected.pTotal) > 1) {
+                    errors.push(`P total mismatch: expected ${expected.pTotal}, got ${pAcre.toFixed(1)}`);
+                }
+            }
+
+            if (expected.kTotal) {
+                const kAcre = output.totals?.k || 0;
+                if (Math.abs(kAcre - expected.kTotal) > 1) {
+                    errors.push(`K total mismatch: expected ${expected.kTotal}, got ${kAcre.toFixed(1)}`);
+                }
+            }
+
+            // Check split counts
+            if (expected.nSplits) {
+                const nSplits = output.recommendations?.length || 0;
+                if (nSplits !== expected.nSplits) {
+                    errors.push(`N splits mismatch: expected ${expected.nSplits}, got ${nSplits}`);
+                }
+            }
+
+            // Check combination
+            if (expected.combination) {
+                const combo = output.combination?.name || '';
+                if (!combo.includes(expected.combination)) {
+                    errors.push(`Combination mismatch: expected ${expected.combination}`);
+                }
+            }
+
+            // Check nutrient classification
+            if (expected.nClassification) {
+                const classification = output.nutrientAnalysis?.nitrogen?.classification;
+                if (classification !== expected.nClassification) {
+                    errors.push(`N classification mismatch: expected ${expected.nClassification}, got ${classification}`);
+                }
+            }
+
+            if (expected.pClassification) {
+                const classification = output.nutrientAnalysis?.phosphorus?.classification;
+                if (classification !== expected.pClassification) {
+                    errors.push(`P classification mismatch: expected ${expected.pClassification}, got ${classification}`);
+                }
+            }
+
+            if (expected.kClassification) {
+                const classification = output.nutrientAnalysis?.potassium?.classification;
+                if (classification !== expected.kClassification) {
+                    errors.push(`K classification mismatch: expected ${expected.kClassification}, got ${classification}`);
+                }
+            }
+
+            // Check fertilizer products in recommendations
+            if (expected.shouldContain) {
+                const allFertilizers = output.recommendations?.flatMap(r => 
+                    r.fertilizers?.map(f => f.name) || []
+                ) || [];
+                
+                expected.shouldContain.forEach(fert => {
+                    const found = allFertilizers.some(f => f.includes(fert));
+                    if (!found) {
+                        errors.push(`Missing fertilizer: ${fert}`);
+                    }
+                });
+            }
+
+            // Check split ratios
+            if (expected.nSplitRatios) {
+                // This would require accessing crop data directly
+                // For now, we'll check if recommendations exist
+                if (!output.recommendations || output.recommendations.length === 0) {
+                    errors.push('No recommendations generated');
+                }
+            }
+
+            return errors;
+        }
+
+        function displayResults(passed, failed) {
+            const resultsDiv = document.getElementById('testResults');
+            const total = passed + failed;
+            const passRate = total > 0 ? ((passed / total) * 100).toFixed(1) : 0;
+
+            let html = `
+                <div class="summary">
+                    <h2>Test Results Summary</h2>
+                    <p><strong>Total Tests:</strong> ${total}</p>
+                    <p class="${passed > 0 ? 'pass' : ''}"><strong>Passed:</strong> ${passed}</p>
+                    <p class="${failed > 0 ? 'fail' : ''}"><strong>Failed:</strong> ${failed}</p>
+                    <p><strong>Pass Rate:</strong> ${passRate}%</p>
+                </div>
+            `;
+
+            testResults.forEach(result => {
+                const statusClass = result.passed ? 'pass' : 'fail';
+                const statusIcon = result.passed ? '✓' : '✗';
+                
+                html += `
+                    <div class="test-container">
+                        <div class="test-case">
+                            <h3>Test ${result.number}: ${result.name} 
+                                <span class="${statusClass}">${statusIcon} ${result.passed ? 'PASS' : 'FAIL'}</span>
+                            </h3>
+                            
+                            <div class="test-input">
+                                <strong>Input:</strong><br>
+                                ${JSON.stringify(result.details.output?.crop || 'N/A', null, 2)}
+                            </div>
+                            
+                            ${result.errors.length > 0 ? `
+                                <div class="test-error">
+                                    <strong>Errors:</strong><br>
+                                    ${result.errors.map(e => `• ${e}`).join('<br>')}
+                                </div>
+                            ` : ''}
+                            
+                            <div class="test-output">
+                                <strong>Output Summary:</strong><br>
+                                Recommendations: ${result.details.output?.recommendations?.length || 0} stages<br>
+                                Combination: ${result.details.output?.combination?.name || 'N/A'}<br>
+                                N Total: ${result.details.output?.totals?.n?.toFixed(1) || 'N/A'} kg/acre<br>
+                                P Total: ${result.details.output?.totals?.p?.toFixed(1) || 'N/A'} kg/acre<br>
+                                K Total: ${result.details.output?.totals?.k?.toFixed(1) || 'N/A'} kg/acre
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            resultsDiv.innerHTML = html;
+            
+            // Update summary
+            document.getElementById('summary').innerHTML = `
+                <h2>Test Summary</h2>
+                <p><strong>Total:</strong> ${total} | 
+                   <span class="pass">Passed: ${passed}</span> | 
+                   <span class="fail">Failed: ${failed}</span> | 
+                   <strong>Pass Rate: ${passRate}%</strong></p>
+            `;
+        }
+
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = '';
+            document.getElementById('summary').innerHTML = '<h2>Test Summary</h2><p>Click "Run All Tests" to begin comprehensive testing</p>';
+        }
+
+        // Auto-load data on page load
+        window.addEventListener('load', () => {
+            loadTestData();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+

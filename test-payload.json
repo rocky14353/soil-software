@@ -1,0 +1,41 @@
+{
+  "crop": "Paddy lowland",
+  "organicCarbon": 0.6,
+  "nitrogen": 150,
+  "phosphorus": 9,
+  "potassium": 50,
+  "season": "Rabi",
+  "fieldType": "Irrigated",
+  "location": "SOUTH TELENGANA",
+  "soilType": "Medium",
+  "sulfur": 9,
+  "ph": 7.5,
+  "ec": 0.6,
+  "calcium": 20,
+  "magnesium": 50,
+  "zinc": 5,
+  "boron": 0.5,
+  "manganese": 20,
+  "iron": 50,
+  "copper": 20,
+  "molybdenum": 0.5,
+  "chlorine": 9.8,
+  "gromorCombination": "Auto-select based on Location",
+  "preferences": {
+    "28-28-0": "Optional",
+    "14-35-14": "Optional",
+    "20-20-0": "Optional",
+    "10-26-26": "Optional",
+    "16-20-0": "Optional",
+    "Urea": "Optional",
+    "MOP": "Optional",
+    "SOP": "Optional",
+    "SSP": "Optional"
+  }
+}
+
+
+
+
+
+

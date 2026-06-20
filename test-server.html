@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Server Test</title>
+</head>
+<body>
+    <h1>Server Test</h1>
+    <div id="results"></div>
+    <script>
+        async function testFiles() {
+            const files = [
+                'data/crops.json',
+                'data/fertilizer-conversion.json',
+                'data/locations.json',
+                'data/soil-test-classification.json',
+                'data/location-crop-recommendations.json',
+                'script.js',
+                'styles.css'
+            ];
+            
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Testing file access:</h2><ul>';
+            
+            for (const file of files) {
+                try {
+                    const response = await fetch(file);
+                    if (response.ok) {
+                        results.innerHTML += `<li style="color: green;">✓ ${file} - OK (${response.status})</li>`;
+                    } else {
+                        results.innerHTML += `<li style="color: red;">✗ ${file} - Error ${response.status}</li>`;
+                    }
+                } catch (error) {
+                    results.innerHTML += `<li style="color: red;">✗ ${file} - Error: ${error.message}</li>`;
+                }
+            }
+            
+            results.innerHTML += '</ul>';
+        }
+        
+        testFiles();
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+

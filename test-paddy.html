@@ -1,0 +1,127 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Paddy Payload Test</title>
+    <script src="script.js"></script>
+</head>
+<body>
+    <h1>Testing Paddy Payload</h1>
+    <div id="results"></div>
+    <!-- Mock DOM elements that calculateRecommendations expects -->
+    <form id="soilTestForm" style="display:none;">
+        <input type="hidden" name="pref_28-28-0" value="Optional">
+        <input type="hidden" name="pref_14-35-14" value="Optional">
+        <input type="hidden" name="pref_20-20-0" value="Optional">
+        <input type="hidden" name="pref_10-26-26" value="Optional">
+        <input type="hidden" name="pref_16-20-0" value="Optional">
+        <input type="hidden" name="pref_Urea" value="Optional">
+        <input type="hidden" name="pref_MOP" value="Optional">
+        <input type="hidden" name="pref_SOP" value="Optional">
+        <input type="hidden" name="pref_SSP" value="Optional">
+    </form>
+    <script>
+        const paddyPayload = {
+            crop: "Paddy lowland",
+            organicCarbon: "0.6",
+            nitrogen: "150",
+            phosphorus: "9",
+            potassium: "50",
+            season: "Rabi",
+            fieldType: "Irrigated",
+            location: "SOUTH TELENGANA",
+            soilType: "Medium",
+            sulfur: "9",
+            ph: "7.5",
+            ec: "0.6",
+            calcium: "20",
+            magnesium: "50",
+            zinc: "5",
+            boron: "0.5",
+            manganese: "20",
+            iron: "50",
+            copper: "20",
+            molybdenum: "0.5",
+            chlorine: "9.8",
+            gromorCombination: "Auto-select based on Location",
+            "28-28-0": "Optional",
+            "14-35-14": "Optional",
+            "20-20-0": "Optional",
+            "10-26-26": "Optional",
+            "16-20-0": "Optional",
+            "Urea": "Optional",
+            "MOP": "Optional",
+            "SOP": "Optional",
+            "SSP": "Optional"
+        };
+        
+        setTimeout(() => {
+            console.log('ðŸ§ª Testing with payload:', paddyPayload);
+            
+            try {
+                const results = calculateRecommendations(paddyPayload);
+                console.log('âœ… Results received:', results);
+                
+                // Calculate totals from recommendations array
+                let totalN = 0, totalP = 0, totalK = 0;
+                if (results.recommendations && Array.isArray(results.recommendations)) {
+                    results.recommendations.forEach(stage => {
+                        if (stage.fertilizers) {
+                            stage.fertilizers.forEach(fert => {
+                                totalN += fert.nContributed || 0;
+                                totalP += fert.pContributed || 0;
+                                totalK += fert.kContributed || 0;
+                            });
+                        }
+                    });
+                } else if (results.stages) {
+                    results.stages.forEach(stage => {
+                        if (stage.fertilizers) {
+                            stage.fertilizers.forEach(fert => {
+                                totalN += fert.nContributed || 0;
+                                totalP += fert.pContributed || 0;
+                                totalK += fert.kContributed || 0;
+                            });
+                        }
+                    });
+                } else if (results.deliveredNPK) {
+                    // Use deliveredNPK if available
+                    totalN = results.deliveredNPK.n || 0;
+                    totalP = results.deliveredNPK.p || 0;
+                    totalK = results.deliveredNPK.k || 0;
+                }
+                
+                console.log('ðŸ“Š Totals:', { totalN, totalP, totalK });
+                console.log('ðŸ“‹ Required:', { N: 48, P: 32, K: 21 });
+                
+                // Display results
+                const resultsDiv = document.getElementById('results');
+                let html = '<h2>Results:</h2>';
+                html += '<p><strong>Total N:</strong> ' + totalN.toFixed(2) + ' kg/acre (Required: 48.0)</p>';
+                html += '<p><strong>Total P:</strong> ' + totalP.toFixed(2) + ' kg/acre (Required: 32.0)</p>';
+                html += '<p><strong>Total K:</strong> ' + totalK.toFixed(2) + ' kg/acre (Required: 21.0)</p>';
+                
+                if (totalP === 0) {
+                    html += '<p style="color:red;"><strong>âŒ ERROR: P delivery is 0.00!</strong></p>';
+                    console.error('âŒ ERROR: P delivery is 0.00!');
+                } else {
+                    html += '<p style="color:green;"><strong>âœ… P delivered: ' + totalP.toFixed(2) + ' kg/acre</strong></p>';
+                }
+                
+                if (totalN < 42.24) {
+                    html += '<p style="color:red;"><strong>âŒ ERROR: N delivery (' + totalN.toFixed(2) + ') is below minimum (42.24)!</strong></p>';
+                    console.error('âŒ ERROR: N delivery is below minimum!');
+                } else {
+                    html += '<p style="color:green;"><strong>âœ… N delivered: ' + totalN.toFixed(2) + ' kg/acre</strong></p>';
+                }
+                
+                html += '<h3>Stages:</h3><pre>' + JSON.stringify(results.recommendations || results.stages || results, null, 2) + '</pre>';
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                console.error('âŒ Error:', error);
+                document.getElementById('results').innerHTML = '<h2>Error:</h2><pre>' + error.message + '</pre><pre>' + error.stack + '</pre>';
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
