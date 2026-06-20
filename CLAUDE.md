@@ -198,3 +198,30 @@ npx @claude-flow/cli@latest doctor --fix
 ```
 
 **Agent tool** handles execution (agents, files, code, git). **MCP tools** handle coordination (swarm, memory, hooks). **CLI** is the same via Bash.
+
+---
+
+## Project: Soil Test NPK Fertilizer Recommendation System
+**Client:** Coromandel Fertilisers Ltd.
+**Type:** Static frontend (HTML + CSS + JS — no server, no build step)
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `index.html` | UI form + output rendering |
+| `rule-engine.js` | Stage splits, restrictions, unit conversions, validation |
+| `styles.css` | Styling |
+| `Sofware.md` | Full business requirements |
+
+### Domain Logic
+- **Inputs:** crop type, organic carbon (%), N (kg/acre), P2O5 (kg/acre), K2O (kg/acre)
+- **N classification:** uses organic carbon thresholds → Low / Medium / High
+- **Stage splits:** Basal / Tillering / Panicle (percentages vary by crop)
+- **Hard restrictions:** K=0 at Tillering, P=0 at Panicle
+- **Tolerances:** ±10% N/K, -5%/+15% P
+- **Unit conversions:** P↔P2O5 (×2.29), K↔K2O (×1.205)
+
+### Do NOT
+- Add a backend — intentionally static
+- Break stage restriction logic
+- Change fertilizer catalog structure without updating rule-engine.js

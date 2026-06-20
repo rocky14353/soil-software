@@ -1,6 +1,6 @@
 /**
  * Rule Engine Module
- * Handles stage split rules, restrictions, and unit normalization
+ * Handles stage split rules, restrictions, unit normalization, and validation
  */
 
 /**
@@ -115,37 +115,30 @@ function isFertilizerAllowedInStage(fertilizer, stageIndex, restrictions = {}) {
  * @param {number} value - Nutrient value
  * @param {string} fromUnit - Source unit ('P', 'P2O5', 'K', 'K2O')
  * @param {string} toUnit - Target unit ('P', 'P2O5', 'K', 'K2O')
- * @returns {number} Normalized value
+ * @returns {{ value: number, valid: boolean, error?: string }} Normalized value with validity flag
  */
 function normalizeNutrients(value, fromUnit, toUnit) {
-    if (fromUnit === toUnit) return value;
+    if (fromUnit === toUnit) return { value, valid: true };
     
     // P to P2O5 conversion: P2O5 = P * 2.29
     if (fromUnit === 'P' && toUnit === 'P2O5') {
-        return value * 2.29;
+        return { value: value * 2.29, valid: true };
     }
     // P2O5 to P conversion: P = P2O5 / 2.29
     if (fromUnit === 'P2O5' && toUnit === 'P') {
-        return value / 2.29;
+        return { value: value / 2.29, valid: true };
     }
     
     // K to K2O conversion: K2O = K * 1.205
     if (fromUnit === 'K' && toUnit === 'K2O') {
-        return value * 1.205;
+        return { value: value * 1.205, valid: true };
     }
     // K2O to K conversion: K = K2O / 1.205
     if (fromUnit === 'K2O' && toUnit === 'K') {
-        return value / 1.205;
+        return { value: value / 1.205, valid: true };
     }
     
-    // N doesn't need conversion (always elemental)
-    if ((fromUnit === 'N' && toUnit === 'N') || 
-        (fromUnit === 'N' && toUnit === 'N')) {
-        return value;
-    }
-    
-    console.warn(`[Rule Engine] Unknown unit conversion: ${fromUnit} to ${toUnit}`);
-    return value;
+    return { value, valid: false, error: `Unknown unit conversion: ${fromUnit} to ${toUnit}` };
 }
 
 /**
@@ -168,26 +161,35 @@ function getToleranceRules() {
 }
 
 /**
- * Validate stage result against targets and restrictions
+ * Validate a single stage result against targets and restrictions.
+ * Uses proper tolerance upper bounds instead of hard-capping at target.
  * @param {object} result - Stage result with delivered nutrients
- * @param {object} targets - Stage targets
- * @param {object} restrictions - Stage restrictions
- * @returns {object} Validation result
+ * @param {object} targets - Stage targets {n, p, k}
+ * @param {object} restrictions - Stage restrictions {k: 0, p: 0, ...}
+ * @returns {object} Validation result { passed, warnings, errors, ratios }
  */
 function validateStageResult(result, targets, restrictions) {
     const tolerance = getToleranceRules().stageWise;
     const validation = {
         passed: true,
         warnings: [],
-        errors: []
+        errors: [],
+        ratios: {}
     };
     
     // Check N
     if (result.deliveredN !== undefined) {
         const nRatio = targets.n > 0 ? result.deliveredN / targets.n : 0;
-        if (result.deliveredN > targets.n) {
+        validation.ratios.n = nRatio;
+        
+        // Use upper tolerance bound — N up to 10% over target is fine
+        const nUpper = targets.n * tolerance.n.max;
+        if (result.deliveredN > nUpper) {
             validation.passed = false;
-            validation.errors.push(`N overflow: ${result.deliveredN.toFixed(2)} > ${targets.n.toFixed(2)} kg`);
+            validation.errors.push(`N overflow: ${result.deliveredN.toFixed(2)} > ${nUpper.toFixed(2)} kg (10% tolerance exceeded)`);
+        } else if (result.deliveredN > targets.n) {
+            // Within tolerance but above target — warn, don't error
+            validation.warnings.push(`N slight over-delivery: ${result.deliveredN.toFixed(2)} > ${targets.n.toFixed(2)} kg (within 10% tolerance)`);
         } else if (nRatio < tolerance.n.min) {
             validation.warnings.push(`N under-delivery: ${result.deliveredN.toFixed(2)} < ${(targets.n * tolerance.n.min).toFixed(2)} kg`);
         }
@@ -195,12 +197,20 @@ function validateStageResult(result, targets, restrictions) {
     
     // Check P
     if (result.deliveredP !== undefined) {
+        validation.ratios.p = targets.p > 0 ? result.deliveredP / targets.p : 0;
+        
         if (restrictions.p === 0 && result.deliveredP > 0.01) {
             validation.passed = false;
             validation.errors.push(`P violation: ${result.deliveredP.toFixed(2)} kg delivered but P not allowed`);
         } else if (targets.p > 0) {
             const pRatio = result.deliveredP / targets.p;
-            if (pRatio < tolerance.p.min) {
+            
+            // Use upper tolerance bound — P up to 15% over target is fine
+            const pUpper = targets.p * tolerance.p.max;
+            if (result.deliveredP > pUpper) {
+                validation.passed = false;
+                validation.errors.push(`P overflow: ${result.deliveredP.toFixed(2)} > ${pUpper.toFixed(2)} kg (15% tolerance exceeded)`);
+            } else if (pRatio < tolerance.p.min) {
                 validation.warnings.push(`P under-delivery: ${result.deliveredP.toFixed(2)} < ${(targets.p * tolerance.p.min).toFixed(2)} kg`);
             }
         }
@@ -208,14 +218,20 @@ function validateStageResult(result, targets, restrictions) {
     
     // Check K
     if (result.deliveredK !== undefined) {
+        const kRatio = targets.k > 0 ? result.deliveredK / targets.k : 0;
+        validation.ratios.k = kRatio;
+        
         if (restrictions.k === 0 && result.deliveredK > 0.01) {
             validation.passed = false;
             validation.errors.push(`K violation: ${result.deliveredK.toFixed(2)} kg delivered but K not allowed`);
         } else if (targets.k > 0) {
-            const kRatio = result.deliveredK / targets.k;
-            if (result.deliveredK > targets.k) {
+            // Use upper tolerance bound — K up to 10% over target is fine
+            const kUpper = targets.k * tolerance.k.max;
+            if (result.deliveredK > kUpper) {
                 validation.passed = false;
-                validation.errors.push(`K overflow: ${result.deliveredK.toFixed(2)} > ${targets.k.toFixed(2)} kg`);
+                validation.errors.push(`K overflow: ${result.deliveredK.toFixed(2)} > ${kUpper.toFixed(2)} kg (10% tolerance exceeded)`);
+            } else if (result.deliveredK > targets.k) {
+                validation.warnings.push(`K slight over-delivery: ${result.deliveredK.toFixed(2)} > ${targets.k.toFixed(2)} kg (within 10% tolerance)`);
             } else if (kRatio < tolerance.k.min) {
                 validation.warnings.push(`K under-delivery: ${result.deliveredK.toFixed(2)} < ${(targets.k * tolerance.k.min).toFixed(2)} kg`);
             }
@@ -225,7 +241,83 @@ function validateStageResult(result, targets, restrictions) {
     return validation;
 }
 
-// Export functions
+/**
+ * Validate the global (across all stages) nutrient delivery.
+ * Sums delivered N/P/K across all stage results and checks against
+ * global ±5% tolerance of total required.
+ * @param {Array<object>} stageResults - Array of stage result objects { deliveredN, deliveredP, deliveredK }
+ * @param {object} totalRequired - { n, p, k } total required per acre
+ * @returns {object} Validation result { passed, warnings, errors, totals }
+ */
+function validateGlobalDelivery(stageResults, totalRequired) {
+    const tolerance = getToleranceRules().global;
+    const validation = {
+        passed: true,
+        warnings: [],
+        errors: [],
+        totals: { n: 0, p: 0, k: 0 },
+        ratios: { n: 0, p: 0, k: 0 }
+    };
+    
+    // Sum delivered across all stages
+    for (const r of stageResults) {
+        validation.totals.n += (r.deliveredN || 0);
+        validation.totals.p += (r.deliveredP || 0);
+        validation.totals.k += (r.deliveredK || 0);
+    }
+    
+    // Compute ratios
+    validation.ratios.n = totalRequired.n > 0 ? validation.totals.n / totalRequired.n : 0;
+    validation.ratios.p = totalRequired.p > 0 ? validation.totals.p / totalRequired.p : 0;
+    validation.ratios.k = totalRequired.k > 0 ? validation.totals.k / totalRequired.k : 0;
+    
+    // Check N
+    const nUpper = totalRequired.n * tolerance.n.max;
+    const nLower = totalRequired.n * tolerance.n.min;
+    if (validation.totals.n > nUpper) {
+        validation.passed = false;
+        validation.errors.push(`Global N overflow: ${validation.totals.n.toFixed(2)} > ${nUpper.toFixed(2)} kg (5% tolerance exceeded)`);
+    } else if (validation.totals.n < nLower) {
+        validation.passed = false;
+        validation.errors.push(`Global N deficit: ${validation.totals.n.toFixed(2)} < ${nLower.toFixed(2)} kg (5% tolerance exceeded)`);
+    }
+    
+    // Check P
+    const pUpper = totalRequired.p * tolerance.p.max;
+    const pLower = totalRequired.p * tolerance.p.min;
+    if (validation.totals.p > pUpper) {
+        validation.passed = false;
+        validation.errors.push(`Global P overflow: ${validation.totals.p.toFixed(2)} > ${pUpper.toFixed(2)} kg (5% tolerance exceeded)`);
+    } else if (validation.totals.p < pLower) {
+        validation.passed = false;
+        validation.errors.push(`Global P deficit: ${validation.totals.p.toFixed(2)} < ${pLower.toFixed(2)} kg (5% tolerance exceeded)`);
+    }
+    
+    // Check K
+    const kUpper = totalRequired.k * tolerance.k.max;
+    const kLower = totalRequired.k * tolerance.k.min;
+    if (validation.totals.k > kUpper) {
+        validation.passed = false;
+        validation.errors.push(`Global K overflow: ${validation.totals.k.toFixed(2)} > ${kUpper.toFixed(2)} kg (5% tolerance exceeded)`);
+    } else if (validation.totals.k < kLower) {
+        validation.passed = false;
+        validation.errors.push(`Global K deficit: ${validation.totals.k.toFixed(2)} < ${kLower.toFixed(2)} kg (5% tolerance exceeded)`);
+    }
+    
+    return validation;
+}
+
+// Export functions for browser (globalThis) and Node.js (module.exports)
+if (typeof globalThis !== 'undefined') {
+    globalThis.calculateStageTargets = calculateStageTargets;
+    globalThis.getStageRestrictions = getStageRestrictions;
+    globalThis.isFertilizerAllowedInStage = isFertilizerAllowedInStage;
+    globalThis.normalizeNutrients = normalizeNutrients;
+    globalThis.getToleranceRules = getToleranceRules;
+    globalThis.validateStageResult = validateStageResult;
+    globalThis.validateGlobalDelivery = validateGlobalDelivery;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         calculateStageTargets,
@@ -233,12 +325,7 @@ if (typeof module !== 'undefined' && module.exports) {
         isFertilizerAllowedInStage,
         normalizeNutrients,
         getToleranceRules,
-        validateStageResult
+        validateStageResult,
+        validateGlobalDelivery
     };
 }
-
-
-
-
-
-
