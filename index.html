@@ -348,12 +348,13 @@
                     </div>
                     <div id="feedbackPreview" style="margin-top: 15px; background: #fff; border: 1px dashed #aaa; border-radius: 6px; padding: 15px; display: none; font-family: monospace; font-size: 13px; white-space: pre-wrap; max-height: 300px; overflow-y: auto;"></div>
                     <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
-                        <button type="button" id="submitFeedbackBtn" class="btn-primary" onclick="generateFeedbackReport()">📥 Download Report</button>
-                        <button type="button" id="copyFeedbackBtn" class="btn-secondary" style="background: #17a2b8; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;" onclick="copyFeedbackToClipboard()">📋 Copy to Clipboard</button>
+                        <button type="button" id="submitFeedbackBtn" class="btn-primary" onclick="submitFeedbackViaGitHub()" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;">🚀 Submit Report → GitHub</button>
+                        <button type="button" id="downloadFeedbackBtn" class="btn-secondary" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;" onclick="downloadFeedbackReport()">📥 Download JSON</button>
                     </div>
                     <div id="feedbackNotification" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none; font-size: 14px;"></div>
-                    <p style="margin-top: 15px; font-size: 12px; color: #999;">
-                        💡 Share the downloaded report file with the developer, or use "Work on it" via WhatsApp.
+                    <p style="margin-top: 12px; font-size: 13px; color: #888;">
+                        🚀 <strong>Submit Report → GitHub</strong> opens a pre-filled issue. Just click "Submit new issue" to log it in the repo.<br>
+                        📥 Download JSON to save a local report file instead.
                     </p>
                 </div>
             </section>

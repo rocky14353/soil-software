@@ -1,19 +1,14 @@
 /**
- * Feedback Module
- * Captures user feedback + full prediction payload as downloadable JSON reports
- * These reports can be uploaded to the repo for debugging.
+ * Feedback Module v2 — Auto-creates GitHub Issues
+ * Submits feedback + full payload directly to the repo as a GitHub Issue
  */
 
-// ── Exposed globally ──────────────────────────────────────────
 var currentFeedbackData = null;
 
 /**
  * Show the feedback section after a prediction
- * @param {object} formData - The original input payload
- * @param {object} results - The recommendation results
  */
 function showFeedbackForm(formData, results) {
-    // Store the data for report generation
     currentFeedbackData = {
         timestamp: new Date().toISOString(),
         inputs: {
@@ -27,118 +22,120 @@ function showFeedbackForm(formData, results) {
             location: formData.location || '',
             soilType: formData.soilType || '',
             pH: formData.ph || '',
-            EC: formData.ec || ''
+            EC: formData.ec || '',
+            sulfur: formData.sulfur || ''
         },
-        systemOutput: {
-            totalN: results.totalN || results.totals?.n || 0,
-            totalP: results.totalP || results.totals?.p || 0,
-            totalK: results.totalK || results.totals?.k || 0,
-            recommendations: results.recommendations || [],
-            globalValidation: results.globalValidation || null
-        },
-        userFeedback: {
-            expectedOutcome: '',
-            whatWasWrong: ''
-        }
+        systemOutput: results.recommendations ? {
+            totals: results.totals || {},
+            globalValidation: results.globalValidation || null,
+            stages: results.recommendations.map(function(s) {
+                return {
+                    name: s.stageName || s.name,
+                    n: s.deliveredN || s.n || 0,
+                    p: s.deliveredP || s.p || 0,
+                    k: s.deliveredK || s.k || 0,
+                    fertilizers: (s.fertilizers || []).map(function(f) {
+                        return { name: f.name, qty: f.qty || f.quantity, n: f.nContributed, p: f.pContributed, k: f.kContributed };
+                    })
+                };
+            })
+        } : results
     };
 
-    // Show the feedback section
-    var section = document.getElementById('feedbackSection');
-    if (section) {
-        section.style.display = 'block';
-        section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    document.getElementById('feedbackSection').style.display = 'block';
+    document.getElementById('feedbackSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 /**
- * Generate and download a JSON feedback report
+ * Build a pre-filled GitHub Issue URL with all feedback data
  */
-function generateFeedbackReport() {
-    var expected = document.getElementById('feedbackWhatExpected')?.value?.trim() || '';
-    var wrong = document.getElementById('feedbackWhatWrong')?.value?.trim() || '';
+function buildIssueUrl() {
+    var expected = (document.getElementById('feedbackWhatExpected')?.value || '').trim();
+    var wrong = (document.getElementById('feedbackWhatWrong')?.value || '').trim();
+    if (!expected || !currentFeedbackData) return null;
 
+    var d = currentFeedbackData;
+    var crop = d.inputs.crop || 'Unknown';
+
+    // Format payload as markdown
+    var inputsBlock = Object.entries(d.inputs)
+        .filter(function(e) { return e[1]; })
+        .map(function(e) { return '- **' + e[0] + ':** ' + e[1]; })
+        .join('\n');
+
+    var outputBlock = '';
+    if (d.systemOutput) {
+        var stages = d.systemOutput.stages || [];
+        outputBlock = stages.map(function(s) {
+            var ferts = (s.fertilizers || []).map(function(f) {
+                return '  - ' + f.name + ': ' + f.qty + ' kg (N=' + f.n + ', P=' + f.p + ', K=' + f.k + ')';
+            }).join('\n');
+            return '### ' + s.name + '\n  N: ' + s.n + ', P: ' + s.p + ', K: ' + s.k + '\n' + ferts;
+        }).join('\n\n');
+    }
+
+    var body = '## Feedback Report\n\n' +
+        '### What user expected\n' + expected + '\n\n' +
+        '### What looks wrong\n' + (wrong || 'Not specified') + '\n\n' +
+        '---\n\n' +
+        '### Input Payload\n' + inputsBlock + '\n\n' +
+        '### System Output\n' + outputBlock + '\n\n' +
+        '---\n' +
+        '_Timestamp: ' + d.timestamp + '_\n' +
+        '_URL: ' + window.location.href + '_';
+
+    var title = '[Feedback] ' + crop + ' - ' + expected.substring(0, 60) + (expected.length > 60 ? '...' : '');
+    var url = 'https://github.com/rocky14353/soil-software/issues/new?title=' +
+        encodeURIComponent(title) +
+        '&body=' + encodeURIComponent(body);
+
+    return url;
+}
+
+/**
+ * Submit feedback via GitHub Issue (auto-opens pre-filled form)
+ */
+function submitFeedbackViaGitHub() {
+    var url = buildIssueUrl();
+    if (!url) {
+        showFeedbackNotification('Please tell us what you expected before submitting.', 'error');
+        return;
+    }
+
+    showFeedbackNotification('Opening GitHub... just click "Submit new issue" ✅', 'success');
+    window.open(url, '_blank');
+}
+
+/**
+ * Download as JSON report (fallback)
+ */
+function downloadFeedbackReport() {
+    var expected = (document.getElementById('feedbackWhatExpected')?.value || '').trim();
+    var wrong = (document.getElementById('feedbackWhatWrong')?.value || '').trim();
     if (!expected) {
-        showFeedbackNotification('Please tell us what you expected instead.', 'error');
+        showFeedbackNotification('Please tell us what you expected before downloading.', 'error');
         return;
     }
 
-    if (!currentFeedbackData) {
-        showFeedbackNotification('No prediction data found. Run a recommendation first.', 'error');
-        return;
-    }
-
-    // Build the report
     var report = JSON.parse(JSON.stringify(currentFeedbackData));
-    report.userFeedback.expectedOutcome = expected;
-    report.userFeedback.whatWasWrong = wrong;
+    report.userFeedback = { expectedOutcome: expected, whatWasWrong: wrong };
     report.reportFormat = 'soil-test-feedback-v1';
-    report.url = window.location.href;
 
-    // Show preview
-    var previewDiv = document.getElementById('feedbackPreview');
-    if (previewDiv) {
-        previewDiv.style.display = 'block';
-        previewDiv.textContent = JSON.stringify(report, null, 2);
-    }
-
-    // Generate filename: crop-timestamp
-    var crop = (currentFeedbackData.inputs.crop || 'unknown')
-        .replace(/[^a-zA-Z0-9]/g, '-')
-        .replace(/-+/g, '-')
-        .toLowerCase();
-    var now = new Date();
-    var ts = now.getFullYear() +
-        String(now.getMonth()+1).padStart(2,'0') +
-        String(now.getDate()).padStart(2,'0') + '-' +
-        String(now.getHours()).padStart(2,'0') +
-        String(now.getMinutes()).padStart(2,'0') +
-        String(now.getSeconds()).padStart(2,'0');
+    var crop = (currentFeedbackData.inputs.crop || 'unknown').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    var ts = new Date().toISOString().replace(/[^0-9]/g, '').substring(0, 14);
     var filename = 'feedback-' + crop + '-' + ts + '.json';
 
-    // Download
     var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showFeedbackNotification('Report saved as ' + filename + ' ✅ Share with the developer!', 'success');
+    showFeedbackNotification('Report saved as ' + filename + ' ✅', 'success');
 }
 
-/**
- * Copy feedback to clipboard (for WhatsApp sharing)
- */
-function copyFeedbackToClipboard() {
-    var expected = document.getElementById('feedbackWhatExpected')?.value?.trim() || '';
-    var wrong = document.getElementById('feedbackWhatWrong')?.value?.trim() || '';
-
-    if (!expected) {
-        showFeedbackNotification('Please tell us what you expected instead.', 'error');
-        return;
-    }
-
-    var crop = currentFeedbackData?.inputs?.crop || '?';
-    var text = '🌾 Soil Test Feedback - ' + crop + '\n' +
-        '━━━━━━━━━━━━━━━━━━━━\n' +
-        '📥 Expected: ' + expected + '\n' +
-        (wrong ? '⚠️ Issue: ' + wrong + '\n' : '') +
-        '━━━━━━━━━━━━━━━━━━━━\n' +
-        '📎 Full report: download from the page';
-
-    navigator.clipboard.writeText(text).then(function() {
-        showFeedbackNotification('Copied to clipboard! Share it via WhatsApp 📱', 'success');
-    }).catch(function() {
-        showFeedbackNotification('Could not copy. Try the Download button instead.', 'error');
-    });
-}
-
-/**
- * Show notification in feedback section
- */
 function showFeedbackNotification(msg, type) {
     var el = document.getElementById('feedbackNotification');
     if (!el) return;
@@ -149,11 +146,6 @@ function showFeedbackNotification(msg, type) {
     el.style.border = '1px solid ' + (type === 'success' ? '#c3e6cb' : '#f5c6cb');
 }
 
-// Export if in Node
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        showFeedbackForm: showFeedbackForm,
-        generateFeedbackReport: generateFeedbackReport,
-        copyFeedbackToClipboard: copyFeedbackToClipboard
-    };
+    module.exports = { showFeedbackForm: showFeedbackForm, submitFeedbackViaGitHub: submitFeedbackViaGitHub, downloadFeedbackReport: downloadFeedbackReport };
 }
