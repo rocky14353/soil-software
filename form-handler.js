@@ -110,6 +110,11 @@ globalThis._runFormSubmission = async function _runFormSubmission() {
         // Display results
         displayResults(results);
         
+        // Show feedback form after results
+        if (typeof showFeedbackForm === 'function') {
+            showFeedbackForm(formData, results);
+        }
+        
     } catch (error) {
         console.error('[handleFormSubmission] Error:', error);
         const errorMsg = error.message || 'Unknown error occurred';
