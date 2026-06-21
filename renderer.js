@@ -1,4 +1,4 @@
-globalThis.displayResults = function displayResults(results) {
+window.displayResults = function displayResults(results) {
     const resultsSection = document.getElementById('resultsSection');
     const resultsContent = document.getElementById('resultsContent');
     

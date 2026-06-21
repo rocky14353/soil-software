@@ -309,13 +309,13 @@ function validateGlobalDelivery(stageResults, totalRequired) {
 
 // Export functions for browser (globalThis) and Node.js (module.exports)
 if (typeof globalThis !== 'undefined') {
-    globalThis.calculateStageTargets = calculateStageTargets;
-    globalThis.getStageRestrictions = getStageRestrictions;
-    globalThis.isFertilizerAllowedInStage = isFertilizerAllowedInStage;
-    globalThis.normalizeNutrients = normalizeNutrients;
-    globalThis.getToleranceRules = getToleranceRules;
-    globalThis.validateStageResult = validateStageResult;
-    globalThis.validateGlobalDelivery = validateGlobalDelivery;
+    window.calculateStageTargets = calculateStageTargets;
+    window.getStageRestrictions = getStageRestrictions;
+    window.isFertilizerAllowedInStage = isFertilizerAllowedInStage;
+    window.normalizeNutrients = normalizeNutrients;
+    window.getToleranceRules = getToleranceRules;
+    window.validateStageResult = validateStageResult;
+    window.validateGlobalDelivery = validateGlobalDelivery;
 }
 
 if (typeof module !== 'undefined' && module.exports) {

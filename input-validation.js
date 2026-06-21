@@ -64,6 +64,6 @@ function validateNumericInputs() {
 
 // Export for browser (globalThis) and Node.js (module.exports)
 if (typeof globalThis !== 'undefined') {
-    globalThis.validateNumericField = validateNumericField;
-    globalThis.validateNumericInputs = validateNumericInputs;
+    window.validateNumericField = validateNumericField;
+    window.validateNumericInputs = validateNumericInputs;
 }

@@ -1,4 +1,4 @@
-globalThis.classifyNitrogenByOC = function classifyNitrogenByOC(organicCarbon, nitrogen) {
+window.classifyNitrogenByOC = function classifyNitrogenByOC(organicCarbon, nitrogen) {
     // Priority: Use Nitrogen value if provided, otherwise use Organic Carbon
     if (nitrogen !== null && nitrogen !== undefined && !isNaN(nitrogen) && nitrogen > 0) {
         // Classify based on Nitrogen value (kg/acre)
@@ -14,25 +14,25 @@ globalThis.classifyNitrogenByOC = function classifyNitrogenByOC(organicCarbon, n
     return 'high';
 }
 
-globalThis.classifyPhosphorus = function classifyPhosphorus(p2o5) {
+window.classifyPhosphorus = function classifyPhosphorus(p2o5) {
     if (p2o5 < 10) return 'low';
     if (p2o5 <= 24) return 'medium';
     return 'high';
 }
 
-globalThis.classifyPotassium = function classifyPotassium(k2o) {
+window.classifyPotassium = function classifyPotassium(k2o) {
     if (k2o < 58) return 'low';
     if (k2o <= 138) return 'medium';
     return 'high';
 }
 
-globalThis.classifySulfur = function classifySulfur(sulfur) {
+window.classifySulfur = function classifySulfur(sulfur) {
     if (!sulfur || sulfur < 10) return 'low';
     if (sulfur <= 15) return 'medium';
     return 'high';
 }
 
-globalThis.classifyPh = function classifyPh(ph) {
+window.classifyPh = function classifyPh(ph) {
     if (!ph || ph === 0) return null;
     
     if (ph <= 5.5) return 'stronglyAcidic';
@@ -46,68 +46,68 @@ globalThis.classifyPh = function classifyPh(ph) {
     return null;
 }
 
-globalThis.classifyEC = function classifyEC(ec) {
+window.classifyEC = function classifyEC(ec) {
     if (!ec || ec === 0) return null;
     if (ec < 0.5) return 'low';
     if (ec <= 2.0) return 'medium';
     return 'high';
 }
 
-globalThis.classifyCalcium = function classifyCalcium(ca) {
+window.classifyCalcium = function classifyCalcium(ca) {
     if (!ca || ca === 0) return null;
     if (ca < 2.0) return 'deficiency';
     return 'sufficiency';
 }
 
-globalThis.classifyMagnesium = function classifyMagnesium(mg) {
+window.classifyMagnesium = function classifyMagnesium(mg) {
     if (!mg || mg === 0) return null;
     if (mg < 1.0) return 'deficiency';
     return 'sufficiency';
 }
 
-globalThis.classifyZinc = function classifyZinc(zn) {
+window.classifyZinc = function classifyZinc(zn) {
     if (!zn || zn === 0) return null;
     if (zn < 1.5) return 'deficiency';
     return 'sufficiency';
 }
 
-globalThis.classifyBoron = function classifyBoron(boron) {
+window.classifyBoron = function classifyBoron(boron) {
     if (!boron || boron === 0) return null;
     if (boron < 0.5) return 'deficiency';
     return 'sufficiency';
 }
 
-globalThis.classifyManganese = function classifyManganese(mn) {
+window.classifyManganese = function classifyManganese(mn) {
     if (!mn || mn === 0) return null;
     if (mn < 5.0) return 'deficiency';
     return 'sufficiency';
 }
 
-globalThis.classifyIron = function classifyIron(fe) {
+window.classifyIron = function classifyIron(fe) {
     if (!fe || fe === 0) return null;
     if (fe < 10.0) return 'deficiency';
     return 'sufficiency';
 }
 
-globalThis.classifyCopper = function classifyCopper(cu) {
+window.classifyCopper = function classifyCopper(cu) {
     if (!cu || cu === 0) return null;
     if (cu < 0.3) return 'deficiency';
     return 'sufficiency';
 }
 
-globalThis.classifyMolybdenum = function classifyMolybdenum(mo) {
+window.classifyMolybdenum = function classifyMolybdenum(mo) {
     if (!mo || mo === 0) return null;
     if (mo < 0.15) return 'deficiency';
     return 'sufficiency';
 }
 
-globalThis.classifyChlorine = function classifyChlorine(cl) {
+window.classifyChlorine = function classifyChlorine(cl) {
     if (!cl || cl === 0) return null;
     if (cl < 20) return 'deficiency';
     return 'sufficiency';
 }
 
-globalThis.getPhRecommendations = function getPhRecommendations(phClassification) {
+window.getPhRecommendations = function getPhRecommendations(phClassification) {
     if (!phClassification) return null;
     
     const recommendations = {
@@ -151,14 +151,14 @@ globalThis.getPhRecommendations = function getPhRecommendations(phClassification
     return recommendations[phClassification] || null;
 }
 
-globalThis.getCropKey = function getCropKey(crop, season) {
+window.getCropKey = function getCropKey(crop, season) {
     if (crop.toLowerCase().includes('paddy')) {
         return season === 'Kharif' ? 'PADDY-KHARIF' : 'PADDY-RABI';
     }
     return crop.toUpperCase().replace(/\s+/g, '-');
 }
 
-globalThis.getLocationBasedRecommendation = function getLocationBasedRecommendation(crop, season, location, fieldType, nStatus, pStatus, kStatus) {
+window.getLocationBasedRecommendation = function getLocationBasedRecommendation(crop, season, location, fieldType, nStatus, pStatus, kStatus) {
     const cropKey = getCropKey(crop, season);
     
     // Try to find in location-crop-recommendations
@@ -186,7 +186,7 @@ globalThis.getLocationBasedRecommendation = function getLocationBasedRecommendat
     return null;
 }
 
-globalThis.classifyNutrient = function classifyNutrient(value, nutrient) {
+window.classifyNutrient = function classifyNutrient(value, nutrient) {
     const thresholds = {
         nitrogen: { low: 150, high: 400 },
         phosphorus: { low: 12, high: 35 },
@@ -201,7 +201,7 @@ globalThis.classifyNutrient = function classifyNutrient(value, nutrient) {
     return 'medium';
 }
 
-globalThis.interpolateFromTable = function interpolateFromTable(table, value, key) {
+window.interpolateFromTable = function interpolateFromTable(table, value, key) {
     if (!table || table.length === 0) return 0;
     
     // Find exact match or interpolate
@@ -230,7 +230,7 @@ globalThis.interpolateFromTable = function interpolateFromTable(table, value, ke
     return (last.dose || last.qty || 0) * factor;
 }
 
-globalThis.selectP2O5Fertilizer = function selectP2O5Fertilizer(p2o5Kgs, stage, preferences, pStatus, locationRec) {
+window.selectP2O5Fertilizer = function selectP2O5Fertilizer(p2o5Kgs, stage, preferences, pStatus, locationRec) {
     const isBasal = stage === 'Basal' || stage.toLowerCase().includes('basal');
     const isFinal = stage === 'Final' || stage.toLowerCase().includes('final');
     
@@ -364,7 +364,7 @@ globalThis.selectP2O5Fertilizer = function selectP2O5Fertilizer(p2o5Kgs, stage, 
     return { product: '28-28-0', method: 'gromor' };
 }
 
-globalThis.convertP2O5ToGromor = function convertP2O5ToGromor(p2o5Kgs, product) {
+window.convertP2O5ToGromor = function convertP2O5ToGromor(p2o5Kgs, product) {
     const table = fertilizerConversion.p2o5ToGromor[product];
     if (!table) {
         // Fallback calculation
@@ -376,7 +376,7 @@ globalThis.convertP2O5ToGromor = function convertP2O5ToGromor(p2o5Kgs, product) 
     return interpolateFromTable(table, p2o5Kgs, 'p2o5');
 }
 
-globalThis.getNutrientsFromGromor = function getNutrientsFromGromor(doseKgs, product) {
+window.getNutrientsFromGromor = function getNutrientsFromGromor(doseKgs, product) {
     const productData = fertilizerConversion.fertilizerProducts[product];
     if (!productData) return { n: 0, p: 0, k: 0 };
     
@@ -387,7 +387,7 @@ globalThis.getNutrientsFromGromor = function getNutrientsFromGromor(doseKgs, pro
     };
 }
 
-globalThis.getNutrientsFromStraight = function getNutrientsFromStraight(fertilizerKgs, fertilizer) {
+window.getNutrientsFromStraight = function getNutrientsFromStraight(fertilizerKgs, fertilizer) {
     const fertName = fertilizer.toLowerCase();
     
     // First try to get from fertilizerProducts (preferred method)
@@ -427,7 +427,7 @@ globalThis.getNutrientsFromStraight = function getNutrientsFromStraight(fertiliz
     return { n: 0, p: 0, k: 0 };
 }
 
-globalThis.convertNToStraight = function convertNToStraight(nKgs, fertilizer) {
+window.convertNToStraight = function convertNToStraight(nKgs, fertilizer) {
     const table = fertilizerConversion.nToStraight[fertilizer];
     if (!table) {
         // Fallback calculation
@@ -438,7 +438,7 @@ globalThis.convertNToStraight = function convertNToStraight(nKgs, fertilizer) {
     return interpolateFromTable(table, nKgs, 'n');
 }
 
-globalThis.convertK2OToStraight = function convertK2OToStraight(k2oKgs, fertilizer) {
+window.convertK2OToStraight = function convertK2OToStraight(k2oKgs, fertilizer) {
     const table = fertilizerConversion.k2oToStraight[fertilizer];
     if (!table) {
         // Fallback calculation
@@ -449,7 +449,7 @@ globalThis.convertK2OToStraight = function convertK2OToStraight(k2oKgs, fertiliz
     return interpolateFromTable(table, k2oKgs, 'k2o');
 }
 
-globalThis.roundToBagPrecise = function roundToBagPrecise(kgs, bagSize = 50, roundUp = false) {
+window.roundToBagPrecise = function roundToBagPrecise(kgs, bagSize = 50, roundUp = false) {
     // Generate options with 2.5kg and 5kg steps
     const options = [];
     
@@ -514,7 +514,7 @@ globalThis.roundToBagPrecise = function roundToBagPrecise(kgs, bagSize = 50, rou
     };
 }
 
-globalThis.roundToBag = function roundToBag(kgs, bagSize = 50) {
+window.roundToBag = function roundToBag(kgs, bagSize = 50) {
     const fullBag = Math.round(kgs / bagSize);
     const halfBag = Math.round(kgs / (bagSize / 2)) * 0.5;
     const quarterBag = Math.round(kgs / (bagSize / 4)) * 0.25;
@@ -539,7 +539,7 @@ globalThis.roundToBag = function roundToBag(kgs, bagSize = 50) {
     };
 }
 
-globalThis.roundToBagUp = function roundToBagUp(kgs, bagSize = 45) {
+window.roundToBagUp = function roundToBagUp(kgs, bagSize = 45) {
     const fullBag = Math.ceil(kgs / bagSize);
     const halfBag = Math.ceil(kgs / (bagSize / 2)) * 0.5;
     const quarterBag = Math.ceil(kgs / (bagSize / 4)) * 0.25;
@@ -568,7 +568,7 @@ globalThis.roundToBagUp = function roundToBagUp(kgs, bagSize = 45) {
     return roundToBag(kgs, bagSize);
 }
 
-globalThis.roundToBagSmart = function roundToBagSmart(kgs, bagSize = 45, minRequired = null, tolerance = 0.10) {
+window.roundToBagSmart = function roundToBagSmart(kgs, bagSize = 45, minRequired = null, tolerance = 0.10) {
     // If no minimum requirement specified, use standard rounding
     if (minRequired === null) {
         return roundToBag(kgs, bagSize);
@@ -590,28 +590,28 @@ globalThis.roundToBagSmart = function roundToBagSmart(kgs, bagSize = 45, minRequ
     return roundedDown;
 }
 
-globalThis.checkPreference = function checkPreference(fertilizer, preferences) {
+window.checkPreference = function checkPreference(fertilizer, preferences) {
     const prefKey = `pref_${fertilizer}`;
     const pref = preferences[prefKey] || 'Optional';
     return pref;
 }
 
-globalThis.fertilizerContainsSulfur = function fertilizerContainsSulfur(fertilizer) {
+window.fertilizerContainsSulfur = function fertilizerContainsSulfur(fertilizer) {
     const sulfurFertilizers = ['A.S', 'SOP', '20-20-0-13', '16-20-0-13'];
     return sulfurFertilizers.includes(fertilizer) || fertilizer.includes('20-0-13') || fertilizer.includes('16-20-0');
 }
 
-globalThis.fertilizerIsAcidifying = function fertilizerIsAcidifying(fertilizer) {
+window.fertilizerIsAcidifying = function fertilizerIsAcidifying(fertilizer) {
     const acidifyingFertilizers = ['Urea', 'A.S'];
     return acidifyingFertilizers.includes(fertilizer);
 }
 
-globalThis.fertilizerIsNeutral = function fertilizerIsNeutral(fertilizer) {
+window.fertilizerIsNeutral = function fertilizerIsNeutral(fertilizer) {
     const neutralFertilizers = ['C.A.N'];
     return neutralFertilizers.includes(fertilizer);
 }
 
-globalThis.shouldPreferFertilizerForS = function shouldPreferFertilizerForS(fertilizer, sStatus) {
+window.shouldPreferFertilizerForS = function shouldPreferFertilizerForS(fertilizer, sStatus) {
     if (!sStatus) return true; // No preference if S status unknown
     
     const hasSulfur = fertilizerContainsSulfur(fertilizer);
@@ -627,7 +627,7 @@ globalThis.shouldPreferFertilizerForS = function shouldPreferFertilizerForS(fert
     return true;
 }
 
-globalThis.shouldPreferFertilizerForPh = function shouldPreferFertilizerForPh(fertilizer, phStatus) {
+window.shouldPreferFertilizerForPh = function shouldPreferFertilizerForPh(fertilizer, phStatus) {
     if (!phStatus) return true; // No preference if pH status unknown
     
     const isAcidifying = fertilizerIsAcidifying(fertilizer);
@@ -649,7 +649,7 @@ globalThis.shouldPreferFertilizerForPh = function shouldPreferFertilizerForPh(fe
     return true;
 }
 
-globalThis.shouldUseFertilizer = function shouldUseFertilizer(fertilizer, preferences, sStatus, phStatus) {
+window.shouldUseFertilizer = function shouldUseFertilizer(fertilizer, preferences, sStatus, phStatus) {
     // First check user preferences
     if (checkPreference(fertilizer, preferences) === 'Reject') return false;
     if (checkPreference(fertilizer, preferences) === 'Mandatory') return true;
@@ -669,7 +669,7 @@ globalThis.shouldUseFertilizer = function shouldUseFertilizer(fertilizer, prefer
     return true;
 }
 
-globalThis.selectNFertilizer = function selectNFertilizer(nRequired, preferences, sStatus, phStatus) {
+window.selectNFertilizer = function selectNFertilizer(nRequired, preferences, sStatus, phStatus) {
     if (nRequired <= 0) return null;
     
     // Priority order based on S and pH
@@ -719,7 +719,7 @@ globalThis.selectNFertilizer = function selectNFertilizer(nRequired, preferences
     return 'Urea'; // Fallback
 }
 
-globalThis.selectKFertilizer = function selectKFertilizer(kRequired, preferences, sStatus, phStatus) {
+window.selectKFertilizer = function selectKFertilizer(kRequired, preferences, sStatus, phStatus) {
     if (kRequired <= 0) return null;
     
     // If S is low or pH is alkaline, prefer SOP (contains 18% S)
@@ -744,7 +744,7 @@ globalThis.selectKFertilizer = function selectKFertilizer(kRequired, preferences
     return 'MOP'; // Fallback
 }
 
-globalThis.selectNFertilizerForSingleNutrientTopUp = function selectNFertilizerForSingleNutrientTopUp(nRequired, preferences, sStatus, phStatus, isSingleNutrientMode) {
+window.selectNFertilizerForSingleNutrientTopUp = function selectNFertilizerForSingleNutrientTopUp(nRequired, preferences, sStatus, phStatus, isSingleNutrientMode) {
     if (nRequired <= 0) return null;
     
     // In single-nutrient top-up mode, prefer Urea first
@@ -759,7 +759,7 @@ globalThis.selectNFertilizerForSingleNutrientTopUp = function selectNFertilizerF
     return selectNFertilizer(nRequired, preferences, sStatus, phStatus);
 }
 
-globalThis.selectPFertilizerForSingleNutrientTopUp = function selectPFertilizerForSingleNutrientTopUp(pRequired, preferences, stageIndex, originalStageN, deliveredN, isSingleNutrientMode) {
+window.selectPFertilizerForSingleNutrientTopUp = function selectPFertilizerForSingleNutrientTopUp(pRequired, preferences, stageIndex, originalStageN, deliveredN, isSingleNutrientMode) {
     if (pRequired <= 0) return null;
     
     // In single-nutrient top-up mode, prefer SSP first
@@ -798,7 +798,7 @@ globalThis.selectPFertilizerForSingleNutrientTopUp = function selectPFertilizerF
     return null;
 }
 
-globalThis.selectKFertilizerForSingleNutrientTopUp = function selectKFertilizerForSingleNutrientTopUp(kRequired, preferences, sStatus, phStatus, isSingleNutrientMode) {
+window.selectKFertilizerForSingleNutrientTopUp = function selectKFertilizerForSingleNutrientTopUp(kRequired, preferences, sStatus, phStatus, isSingleNutrientMode) {
     if (kRequired <= 0) return null;
     
     // In single-nutrient top-up mode, prefer MOP first, then SOP
@@ -821,7 +821,7 @@ globalThis.selectKFertilizerForSingleNutrientTopUp = function selectKFertilizerF
     return selectKFertilizer(kRequired, preferences, sStatus, phStatus);
 }
 
-globalThis.getCropData = function getCropData(cropName, season, fieldType) {
+window.getCropData = function getCropData(cropName, season, fieldType) {
     const crop = cropsData[cropName];
     if (!crop) return null;
     
@@ -831,7 +831,7 @@ globalThis.getCropData = function getCropData(cropName, season, fieldType) {
     return crop[fieldTypeKey]?.[seasonKey] || crop[fieldTypeKey]?.['rabi'] || null;
 }
 
-globalThis.calculateConstrainedQuantity = function calculateConstrainedQuantity(fertilizerName, stagePRequired, stageNRequired, stageKRequired,
+window.calculateConstrainedQuantity = function calculateConstrainedQuantity(fertilizerName, stagePRequired, stageNRequired, stageKRequired,
                                      stageIndex, pStatus, locationRec) {
     // Get fertilizer composition
     const productData = fertilizerConversion.fertilizerProducts[fertilizerName];
@@ -924,7 +924,7 @@ globalThis.calculateConstrainedQuantity = function calculateConstrainedQuantity(
     return { quantity: rounded.kgs, nutrients: roundedNutrients, valid: true };
 }
 
-globalThis.isFertilizerAllowedInStage = function isFertilizerAllowedInStage(fertilizer, stageIndex, stageTargets, deliveredNutrients, tolerance = 0.12) {
+window.isFertilizerAllowedInStage = function isFertilizerAllowedInStage(fertilizer, stageIndex, stageTargets, deliveredNutrients, tolerance = 0.12) {
     const restrictions = {
         k: stageIndex === 1 ? 0 : undefined, // Tillering: K=0
         p: stageIndex === 2 ? 0 : undefined  // Panicle: P=0
@@ -967,7 +967,7 @@ globalThis.isFertilizerAllowedInStage = function isFertilizerAllowedInStage(fert
     return { allowed: true, reason: '' };
 }
 
-globalThis.safeAddFertilizer = function safeAddFertilizer(stage, fertilizer, stageIndex, stageTargets, deliveredNutrients, passName) {
+window.safeAddFertilizer = function safeAddFertilizer(stage, fertilizer, stageIndex, stageTargets, deliveredNutrients, passName) {
     const fertN = fertilizer.nContributed || fertilizer.n || 0;
     const fertP = fertilizer.pContributed || fertilizer.p || 0;
     const fertK = fertilizer.kContributed || fertilizer.k || 0;
@@ -999,7 +999,7 @@ globalThis.safeAddFertilizer = function safeAddFertilizer(stage, fertilizer, sta
     return true;
 }
 
-globalThis.scoreFertilizerCandidate = function scoreFertilizerCandidate(candidate, stagePRequired, stageNRequired, stageKRequired, stageIndex) {
+window.scoreFertilizerCandidate = function scoreFertilizerCandidate(candidate, stagePRequired, stageNRequired, stageKRequired, stageIndex) {
     const nutrients = candidate.nutrients;
     
     // REJECT if N/K overflow (should not happen if calculateConstrainedQuantity works correctly)
@@ -1027,13 +1027,13 @@ globalThis.scoreFertilizerCandidate = function scoreFertilizerCandidate(candidat
     return excessP * 2.0 - (nUtilization * 0.1) - (kUtilization * 0.1);
 }
 
-globalThis.calculateStagePFirst = function calculateStagePFirst(stageIndex, stagePRequired, stageNRequired, stageKRequired,
+window.calculateStagePFirst = function calculateStagePFirst(stageIndex, stagePRequired, stageNRequired, stageKRequired,
                                pStatus, nStatus, kStatus, preferences, sStatus, phStatus,
 
-globalThis.calculatePFirstComplete = function calculatePFirstComplete(cropData, nPerSplit, kPerSplit, pPerSplit, 
+window.calculatePFirstComplete = function calculatePFirstComplete(cropData, nPerSplit, kPerSplit, pPerSplit, 
                                   pStatus, nStatus, kStatus, preferences, 
 
-globalThis.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, combinationName) {
+window.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, combinationName) {
     if (!recommendations || recommendations.length === 0) return;
     
     // Calculate total required nutrients
@@ -1438,7 +1438,7 @@ globalThis.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, n
     });
 }
 
-globalThis.convertP2O5ToGromorDirect = function convertP2O5ToGromorDirect(p2o5Required, product, p2o5Status, locationRec) {
+window.convertP2O5ToGromorDirect = function convertP2O5ToGromorDirect(p2o5Required, product, p2o5Status, locationRec) {
     // Calculate actual Gromor quantity from P requirement using conversion table
     const table = fertilizerConversion.p2o5ToGromor[product];
     if (!table) {
@@ -1466,7 +1466,7 @@ globalThis.convertP2O5ToGromorDirect = function convertP2O5ToGromorDirect(p2o5Re
     return calculatedDose;
 }
 
-globalThis.calculateCombination1 = function calculateCombination1(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+window.calculateCombination1 = function calculateCombination1(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
     const recommendations = [];
     
     // EXCEPTION 2: Calculate P first because complex fertilizers contain N, K, and S along with P
@@ -2153,7 +2153,7 @@ globalThis.calculateCombination1 = function calculateCombination1(cropData, nPer
     return recommendations;
 }
 
-globalThis.calculateCombination2 = function calculateCombination2(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+window.calculateCombination2 = function calculateCombination2(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
     const recommendations = [];
     
     // Stage 1: Basal with 14-35-14
@@ -2781,7 +2781,7 @@ globalThis.calculateCombination2 = function calculateCombination2(cropData, nPer
     return recommendations;
 }
 
-globalThis.calculateCombination3 = function calculateCombination3(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+window.calculateCombination3 = function calculateCombination3(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
     const recommendations = [];
     
     // Stage 1: Basal with 14-35-14
@@ -3409,7 +3409,7 @@ globalThis.calculateCombination3 = function calculateCombination3(cropData, nPer
     return recommendations;
 }
 
-globalThis.calculateCombination4 = function calculateCombination4(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+window.calculateCombination4 = function calculateCombination4(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
     const recommendations = [];
     
     // Stage 1: Basal with 28-28-0
@@ -3987,7 +3987,7 @@ globalThis.calculateCombination4 = function calculateCombination4(cropData, nPer
     return recommendations;
 }
 
-globalThis.calculateCombination5 = function calculateCombination5(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+window.calculateCombination5 = function calculateCombination5(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
     const recommendations = [];
     
     // Stage 1: Basal with 28-28-0
@@ -4614,7 +4614,7 @@ globalThis.calculateCombination5 = function calculateCombination5(cropData, nPer
     return recommendations;
 }
 
-globalThis.calculateCombination6 = function calculateCombination6(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
+window.calculateCombination6 = function calculateCombination6(cropData, nPerSplit, kPerSplit, pPerSplit, pStatus, locationRec, preferences, sStatus, phStatus) {
     const recommendations = [];
     
     // Stage 1: Basal with 14-35-14
@@ -5245,7 +5245,7 @@ globalThis.calculateCombination6 = function calculateCombination6(cropData, nPer
     return recommendations;
 }
 
-globalThis.optimizeCombination = function optimizeCombination(cropData, nPerSplit, kPerSplit, pPerSplit, recommendedP, recommendedN, recommendedK, 
+window.optimizeCombination = function optimizeCombination(cropData, nPerSplit, kPerSplit, pPerSplit, recommendedP, recommendedN, recommendedK, 
                               pStatus, locationRec, preferences, sStatus, phStatus, location, nStatus, kStatus) {
     // NEW REDESIGN: Use P-first complete system instead of old combination functions
     // Use provided nStatus and kStatus, or defaults
@@ -5355,7 +5355,7 @@ globalThis.optimizeCombination = function optimizeCombination(cropData, nPerSpli
     }
 }
 
-globalThis.optimizeCombinationOld = function optimizeCombinationOld(cropData, nPerSplit, kPerSplit, pPerSplit, recommendedP, recommendedN, recommendedK, 
+window.optimizeCombinationOld = function optimizeCombinationOld(cropData, nPerSplit, kPerSplit, pPerSplit, recommendedP, recommendedN, recommendedK, 
                               pStatus, locationRec, preferences, sStatus, phStatus, location) {
     const combinations = ['1', '2', '3', '4', '5', '6'];
     const tolerance = 0.10; // 10% tolerance for excess nutrients
@@ -5488,7 +5488,7 @@ globalThis.optimizeCombinationOld = function optimizeCombinationOld(cropData, nP
     };
 }
 
-globalThis.calculateRecommendations = function calculateRecommendations(formData) {
+window.calculateRecommendations = function calculateRecommendations(formData) {
     const crop = formData.crop;
     const organicCarbon = parseFloat(formData.organicCarbon);
     const nitrogen = formData.nitrogen !== null && formData.nitrogen !== undefined && formData.nitrogen !== '' 

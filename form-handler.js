@@ -1,11 +1,11 @@
-globalThis.handleFormSubmission = function handleFormSubmission() {
+window.handleFormSubmission = function handleFormSubmission() {
     _runFormSubmission().catch(function(err) {
         console.error('[handleFormSubmission] Unhandled error:', err);
         alert('❌ Unexpected error: ' + (err.message || err));
     });
 }
 
-globalThis._runFormSubmission = async function _runFormSubmission() {
+window._runFormSubmission = async function _runFormSubmission() {
     const btn = document.getElementById('getRecommendationBtn');
     const originalText = btn ? btn.textContent : 'Get Recommendation';
 
@@ -143,7 +143,7 @@ globalThis._runFormSubmission = async function _runFormSubmission() {
     }
 }
 
-globalThis.savePayload = function savePayload() {
+window.savePayload = function savePayload() {
     const form = document.getElementById('soilTestForm');
     const formData = new FormData(form);
     const payload = {};
@@ -190,7 +190,7 @@ globalThis.savePayload = function savePayload() {
     showPayloadNotification('Payload saved successfully!', 'success');
 }
 
-globalThis.loadPayload = function loadPayload() {
+window.loadPayload = function loadPayload() {
     const savedPayload = localStorage.getItem('soilTestPayload');
     
     if (!savedPayload) {
@@ -257,7 +257,7 @@ globalThis.loadPayload = function loadPayload() {
     }
 }
 
-globalThis.showPayloadNotification = function showPayloadNotification(message, type) {
+window.showPayloadNotification = function showPayloadNotification(message, type) {
     const notification = document.getElementById('payloadNotification');
     notification.textContent = message;
     notification.style.display = 'block';
