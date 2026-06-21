@@ -128,7 +128,8 @@ window._runFormSubmission = async function _runFormSubmission() {
                 <div style="padding:20px;background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:5px;">
                     <h3 style="margin-top:0;">❌ Error Generating Recommendation</h3>
                     <p><strong>Error:</strong> ${errorMsg}</p>
-                    <p>Please check browser console (F12) for details.</p>
+                    <p>💡 <strong>Tip:</strong> Hard refresh (Ctrl+Shift+R / Cmd+Shift+R) usually fixes this. If not, try incognito/private window.</p>
+                    <p>Check browser console (F12) for details.</p>
                 </div>`;
             resultsSection.scrollIntoView({ behavior: 'smooth' });
         } else {
