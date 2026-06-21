@@ -1027,12 +1027,6 @@ window.scoreFertilizerCandidate = function scoreFertilizerCandidate(candidate, s
     return excessP * 2.0 - (nUtilization * 0.1) - (kUtilization * 0.1);
 }
 
-window.calculateStagePFirst = function calculateStagePFirst(stageIndex, stagePRequired, stageNRequired, stageKRequired,
-                               pStatus, nStatus, kStatus, preferences, sStatus, phStatus,
-
-window.calculatePFirstComplete = function calculatePFirstComplete(cropData, nPerSplit, kPerSplit, pPerSplit, 
-                                  pStatus, nStatus, kStatus, preferences, 
-
 window.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, nPerSplit, pPerSplit, kPerSplit, preferences, sStatus, phStatus, pStatus, locationRec, combinationName) {
     if (!recommendations || recommendations.length === 0) return;
     
