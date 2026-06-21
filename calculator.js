@@ -172,6 +172,20 @@ window.getLocationBasedRecommendation = function getLocationBasedRecommendation(
         };
     }
     
+    // Try fieldType-based lookup (works for MAIZE which has fieldType keys)
+    const ftKey = (fieldType || 'Irrigated').toLowerCase();
+    if (locationCropRecommendations[cropKey] && locationCropRecommendations[cropKey][ftKey]) {
+        const rec = locationCropRecommendations[cropKey][ftKey];
+        if (rec.nStatus || rec.pStatus || rec.kStatus) {
+            return {
+                n: rec.nStatus[nStatus] || rec.normal.n,
+                p: rec.pStatus[pStatus] || rec.normal.p,
+                k: rec.kStatus[kStatus] || rec.normal.k,
+                gromorByPStatus: rec.gromorByPStatus
+            };
+        }
+    }
+    
     // Fallback to crop master data
     const cropData = getCropData(crop, season, fieldType);
     if (cropData) {
@@ -3414,7 +3428,7 @@ window.calculateCombination4 = function calculateCombination4(cropData, nPerSpli
     const gromor28280 = convertP2O5ToGromor(basalP, '28-28-0');
     // Note: remainingN will be recalculated after rounding
     let remainingN = basalN;
-    const remainingK = Math.max(0, basalK);
+    let remainingK = Math.max(0, basalK);
     
     const stage1 = {
         stage: cropData.splits.n.stages[0],

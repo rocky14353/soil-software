@@ -2,9 +2,8 @@
 /**
  * Standalone Regression Test Runner
  *
- * Runs ALL crop × location × soil status payload combinations against the
- * REAL calculator.js and validates NPK targets against
- * data/location-crop-recommendations.json.
+ * Runs ALL crop × location × soil status × gromor combination payload
+ * combinations against the REAL calculator.js and validates NPK targets.
  *
  * Run: node tests/run-regression.js
  */
@@ -52,10 +51,6 @@ global.alert = function alert(msg) {
 // We'll suppress verbose logs later; for now keep them.
 
 // --- Minimal document mock -------------------------------------------------
-// The scripts call document.getElementById() to read form values.
-// We return an object with a .value property that defaults to empty string.
-// The soilTestForm.querySelectorAll() is only called from the preferences
-// extraction inside calculateRecommendations — we provide a noop selector.
 class MockElement {
   constructor(id, value) {
     this.id = id;
@@ -111,7 +106,6 @@ function setupDocumentFromPayload(payload) {
 // ===========================================================================
 
 // Node.js v22 supports optional chaining natively — no transpilation needed.
-// Still needed: strip broken/incomplete function stubs (dead code with syntax errors)
 var transpile = function transpile(src) {
   return src;
 };
@@ -120,11 +114,6 @@ var transpile = function transpile(src) {
 global.window = global;   // In Node, window === global makes `window.XXX` assign to global
 
 // The scripts also reference these globals directly:
-//   cropsData, locationCropRecommendations, fertilizerConversion, etc.
-// They are set via fetch() by script.js. Since we mock fetch, they'll be
-// populated asynchronously. But we also need them available immediately
-// because calculator.js references them.
-// We set them on global so the scripts can find them.
 global.cropsData = cropsData;
 global.fertilizerConversion = fertConversion;
 global.locationsData = locationsData;
@@ -157,9 +146,7 @@ for (const file of scriptFiles) {
   }
 }
 
-// Wait for async loadData() from script.js to complete (it's a fire-and-forget
-// async function that runs on eval; our mock fetch resolves instantly but the
-// promise microtask hasn't flushed yet)
+// Wait for async loadData() from script.js to complete
 function flushMicrotasks() {
   return new Promise(function(resolve) { setImmediate(resolve); });
 }
@@ -171,6 +158,7 @@ function flushMicrotasks() {
 const LOCATIONS = Object.keys(locationsData.locationPreferences);
 const STATUSES  = ['low', 'medium', 'high'];
 const VALID_COMBINATIONS = ['1', '2', '3', '4', '5', '6'];
+const DEFAULT_LOCATION = 'GODAVARI DELTA';
 
 const SOIL_INPUTS = {
   n: {
@@ -222,6 +210,7 @@ function getCropKey(crop, season) {
 
 /**
  * Get expected NPK targets from location-crop-recommendations.json
+ * or fall back to crops.json base NPK with status adjustment.
  */
 function getExpectedNPK(crop, season, location, nStatus, pStatus, kStatus, fieldType) {
   const cropKey = getCropKey(crop, season);
@@ -318,89 +307,56 @@ function buildPayload(crop, season, fieldType, location, nStatus, pStatus, kStat
 }
 
 /**
- * Generate ALL test payloads
+ * Generate ALL test payloads — ALL 50 crops, ALL 6 gromor combinations
  */
 function generateAllPayloads() {
   const payloads = [];
   const paddyCrops = ['Paddy Upland', 'Paddy Mediumland', 'Paddy lowland'];
-  const otherCrops = Object.keys(cropsData).filter(function(c) {
-    return !paddyCrops.includes(c);
-  });
+  const allCrops = Object.keys(cropsData);
 
-  // ── PADDY CROPS: 3 crops × 2 seasons × 8 locations × 27 status combos = 1296
-  // But only locations that exist in the recommendations data
-  for (const crop of paddyCrops) {
-    const seasons = getSeasonsForCrop(crop, 'Irrigated');
-    for (const season of seasons) {
-      for (const location of LOCATIONS) {
-        const cropKey = getCropKey(crop, season);
-        if (locationCropRecs[cropKey] && locationCropRecs[cropKey][location]) {
-          for (const nStatus of STATUSES) {
-            for (const pStatus of STATUSES) {
-              for (const kStatus of STATUSES) {
-                payloads.push({
-                  payload: buildPayload(crop, season, 'Irrigated', location, nStatus, pStatus, kStatus, '1'),
-                  description: crop + '/' + season + '/Irrigated/' + location +
-                    ' N=' + nStatus + ' P=' + pStatus + ' K=' + kStatus
-                });
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // ── MAIZE: irrigated + rainfed
-  if (cropsData['Maize']) {
-    const ftTypes = getFieldTypesForCrop('Maize');
-    for (const fieldType of ftTypes) {
-      const seasons = getSeasonsForCrop('Maize', fieldType);
-      for (const season of seasons) {
-        const cropKey = getCropKey('Maize', season);
-        if (locationCropRecs[cropKey]) {
-          const availableLocations = Object.keys(locationCropRecs[cropKey]).filter(function(l) {
-            return LOCATIONS.includes(l);
-          });
-          for (const location of availableLocations) {
-            for (const nStatus of STATUSES) {
-              for (const pStatus of STATUSES) {
-                for (const kStatus of STATUSES) {
-                  payloads.push({
-                    payload: buildPayload('Maize', season, fieldType, location, nStatus, pStatus, kStatus, '1'),
-                    description: 'Maize/' + season + '/' + fieldType + '/' + location +
-                      ' N=' + nStatus + ' P=' + pStatus + ' K=' + kStatus
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // ── OTHER CROPS (non-Maize, non-Paddy)
-  for (const crop of otherCrops) {
-    if (crop === 'Maize') continue;
+  // ── ALL CROPS: iterate over every crop ─────────────────────────────
+  for (const crop of allCrops) {
+    const isPaddy = paddyCrops.includes(crop);
     const ftTypes = getFieldTypesForCrop(crop);
+
     for (const fieldType of ftTypes) {
       const seasons = getSeasonsForCrop(crop, fieldType);
+
       for (const season of seasons) {
         const cropKey = getCropKey(crop, season);
         const locRec = locationCropRecs[cropKey];
-        if (locRec) {
-          const availableLocations = Object.keys(locRec).filter(function(l) {
+
+        // Determine which locations to test
+        let testLocations;
+
+        if (isPaddy) {
+          // Paddy: test all locations that have data
+          testLocations = LOCATIONS.filter(function(l) {
+            return locRec && locRec[l];
+          });
+        } else if (locRec) {
+          // Other crops WITH location-crop-recommendation data (e.g. Maize)
+          testLocations = Object.keys(locRec).filter(function(l) {
             return LOCATIONS.includes(l);
           });
-          for (const location of availableLocations) {
-            for (const nStatus of STATUSES) {
-              for (const pStatus of STATUSES) {
-                for (const kStatus of STATUSES) {
+        } else {
+          // Non-Paddy crops WITHOUT location data: use GODAVARI DELTA
+          testLocations = [DEFAULT_LOCATION];
+        }
+
+        if (testLocations.length === 0) {
+          testLocations = [DEFAULT_LOCATION];
+        }
+
+        for (const location of testLocations) {
+          for (const nStatus of STATUSES) {
+            for (const pStatus of STATUSES) {
+              for (const kStatus of STATUSES) {
+                for (const combo of VALID_COMBINATIONS) {
                   payloads.push({
-                    payload: buildPayload(crop, season, fieldType, location, nStatus, pStatus, kStatus, '1'),
+                    payload: buildPayload(crop, season, fieldType, location, nStatus, pStatus, kStatus, combo),
                     description: crop + '/' + season + '/' + fieldType + '/' + location +
-                      ' N=' + nStatus + ' P=' + pStatus + ' K=' + kStatus
+                      ' N=' + nStatus + ' P=' + pStatus + ' K=' + kStatus + ' C=' + combo
                   });
                 }
               }
@@ -442,6 +398,7 @@ function validateResult(payload, result) {
   var season     = payload.season;
   var fieldType  = payload.fieldType;
   var location   = payload.location;
+  var combo      = payload.gromorCombination;
 
   var ss = result.soilTestStatus;
   var nStatus = ss.nStatus;
@@ -507,14 +464,7 @@ function validateResult(payload, result) {
     }
   });
 
-  // ── Check 3: Gromor combination is valid ──────────────────────
-  // (just verify it has a name)
-  var comboInfo = result.combination;
-  if (comboInfo && comboInfo.name) {
-    // Valid — noop
-  }
-
-  // ── Check 4: Delivered NPK (with bag rounding tolerance) ──────
+  // ── Check 3: Delivered NPK (with bag rounding tolerance) ──────
   var delivered = computeDeliveredNPK(recommendations);
 
   if (result.totals && result.totals.n > 0) {
@@ -546,7 +496,8 @@ function validateResult(payload, result) {
     expectedNPK:  expected,
     actualNPK:    recommended,
     deliveredNPK: delivered,
-    stageCount:   recommendations.length
+    stageCount:   recommendations.length,
+    combo:        combo
   };
 }
 
@@ -631,8 +582,8 @@ async function main() {
       });
     }
 
-    // Progress indicator every 100 tests
-    if ((i + 1) % 100 === 0) {
+    // Progress indicator every 1000 tests
+    if ((i + 1) % 1000 === 0) {
       process.stdout.write('.');
     }
   }
@@ -729,7 +680,6 @@ async function main() {
       timestamp: new Date().toISOString()
     },
     results: results.map(function(r) {
-      // Include full result for analysis
       return {
         index:        r.index,
         description:  r.description,

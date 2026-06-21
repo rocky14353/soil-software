@@ -16,7 +16,6 @@
     "verbose": true
   },
   "devDependencies": {
-    "jest": "^25.0.0",
-    "jest-environment-jsdom": "^30.4.1"
+    "jest": "^25.0.0"
   }
 }

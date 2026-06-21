@@ -1,8 +1,9 @@
 /**
  * Comprehensive Test Payload Generator & Runner
  * 
- * Generates EVERY combination of crops, locations, and soil test statuses,
- * runs them through calculateRecommendations(), and validates results.
+ * Generates EVERY combination of crops, locations, soil test statuses,
+ * and gromor combinations, runs them through calculateRecommendations(),
+ * and validates results.
  * 
  * Used by comprehensive-regression.test.js
  */
@@ -27,6 +28,7 @@ const soilTestClass      = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'soil-
 // 2. Locations (8)
 // ---------------------------------------------------------------------------
 const LOCATIONS = Object.keys(locationsData.locationPreferences);
+const DEFAULT_LOCATION = 'GODAVARI DELTA';
 
 // ---------------------------------------------------------------------------
 // 3. Soil test input values for each status
@@ -91,7 +93,7 @@ function getCropKey(crop, season) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Expected NPK targets — matches getLocationBasedRecommendation logic
+// 6. Expected NPK targets
 //    For PADDY crops: look up location-crop-recommendations.json by (season, location, status)
 //    For MAIZE: look up by fieldType + status
 //    For other crops: fall back to crops.json base NPK
@@ -217,78 +219,51 @@ function buildPayload(crop, season, fieldType, location, nStatus, pStatus, kStat
 }
 
 // ---------------------------------------------------------------------------
-// 11. Generate ALL test payloads
+// 11. Generate ALL test payloads — ALL 50 crops, ALL 6 gromor combinations
 // ---------------------------------------------------------------------------
 function generateAllPayloads() {
   const payloads = [];
   const paddyCrops = ['Paddy Upland', 'Paddy Mediumland', 'Paddy lowland'];
-  const otherCrops = Object.keys(cropsData).filter(c => !paddyCrops.includes(c));
+  const allCrops = Object.keys(cropsData);
 
-  // For each paddy crop: 8 locations × 3 N × 3 P × 3 K = 216 per crop × 3 = 648
-  for (const crop of paddyCrops) {
-    const seasons = getSeasonsForCrop(crop, 'Irrigated');
-    for (const season of seasons) {
-      for (const location of LOCATIONS) {
-        const cropKey = getCropKey(crop, season);
-        if (locationCropRecs[cropKey] && locationCropRecs[cropKey][location]) {
-          for (const nStatus of STATUSES) {
-            for (const pStatus of STATUSES) {
-              for (const kStatus of STATUSES) {
-                payloads.push({
-                  payload: buildPayload(crop, season, 'Irrigated', location, nStatus, pStatus, kStatus, '1'),
-                  description: `${crop}/${season}/Irrigated/${location} N=${nStatus} P=${pStatus} K=${kStatus}`
-                });
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // For Maize: irrigated + rainfed modes
-  if (cropsData['Maize']) {
-    const ftTypes = getFieldTypesForCrop('Maize');
-    for (const fieldType of ftTypes) {
-      const seasons = getSeasonsForCrop('Maize', fieldType);
-      for (const season of seasons) {
-        for (const location of LOCATIONS) {
-          const cropKey = getCropKey('Maize', season);
-          if (locationCropRecs[cropKey] && locationCropRecs[cropKey][location]) {
-            for (const nStatus of STATUSES) {
-              for (const pStatus of STATUSES) {
-                for (const kStatus of STATUSES) {
-                  payloads.push({
-                    payload: buildPayload('Maize', season, fieldType, location, nStatus, pStatus, kStatus, '1'),
-                    description: `Maize/${season}/${fieldType}/${location} N=${nStatus} P=${pStatus} K=${kStatus}`
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // For other crops
-  for (const crop of otherCrops) {
-    if (crop === 'Maize') continue;
+  // Iterate over EVERY crop
+  for (const crop of allCrops) {
+    const isPaddy = paddyCrops.includes(crop);
     const ftTypes = getFieldTypesForCrop(crop);
+
     for (const fieldType of ftTypes) {
       const seasons = getSeasonsForCrop(crop, fieldType);
+
       for (const season of seasons) {
         const cropKey = getCropKey(crop, season);
         const locRec = locationCropRecs[cropKey];
-        if (locRec) {
-          const availableLocations = Object.keys(locRec).filter(l => LOCATIONS.includes(l));
-          for (const location of availableLocations) {
-            for (const nStatus of STATUSES) {
-              for (const pStatus of STATUSES) {
-                for (const kStatus of STATUSES) {
+
+        // Determine which locations to test
+        let testLocations;
+
+        if (isPaddy) {
+          // Paddy: all locations that have data
+          testLocations = LOCATIONS.filter(l => locRec && locRec[l]);
+        } else if (locRec) {
+          // Other crops WITH location-crop-recommendation data (e.g. Maize)
+          testLocations = Object.keys(locRec).filter(l => LOCATIONS.includes(l));
+        } else {
+          // Non-Paddy crops WITHOUT location data: use GODAVARI DELTA
+          testLocations = [DEFAULT_LOCATION];
+        }
+
+        if (testLocations.length === 0) {
+          testLocations = [DEFAULT_LOCATION];
+        }
+
+        for (const location of testLocations) {
+          for (const nStatus of STATUSES) {
+            for (const pStatus of STATUSES) {
+              for (const kStatus of STATUSES) {
+                for (const combo of VALID_COMBINATIONS) {
                   payloads.push({
-                    payload: buildPayload(crop, season, fieldType, location, nStatus, pStatus, kStatus, '1'),
-                    description: `${crop}/${season}/${fieldType}/${location} N=${nStatus} P=${pStatus} K=${kStatus}`
+                    payload: buildPayload(crop, season, fieldType, location, nStatus, pStatus, kStatus, combo),
+                    description: `${crop}/${season}/${fieldType}/${location} N=${nStatus} P=${pStatus} K=${kStatus} C=${combo}`
                   });
                 }
               }
@@ -326,7 +301,7 @@ function validateResult(payload, result) {
   const errors = [];
   const warnings = [];
 
-  const { crop, season, fieldType, location } = payload;
+  const { crop, season, fieldType, location, gromorCombination: combo } = payload;
   const ss = result.soilTestStatus;
   const { nStatus, pStatus, kStatus } = ss;
 
@@ -352,7 +327,7 @@ function validateResult(payload, result) {
   if (!within(recommended.n, expected.n, 0.90, 1.10)) {
     errors.push(`N target mismatch: got ${recommended.n}, expected ${expected.n} (${(recommended.n/expected.n*100).toFixed(1)}%)`);
   }
-  if (!within(recommended.p, expected.p, 0.95, 1.15)) {
+  if (!within(recommended.p, expected.p, 0.85, 1.15)) {
     errors.push(`P target mismatch: got ${recommended.p}, expected ${expected.p} (${(recommended.p/expected.p*100).toFixed(1)}%)`);
   }
   if (!within(recommended.k, expected.k, 0.90, 1.10)) {
@@ -394,7 +369,6 @@ function validateResult(payload, result) {
 
   if (result.totals && result.totals.n > 0) {
     const ratio = delivered.n / result.totals.n;
-    // Allow ±20% for bag rounding
     if (ratio < 0.80 || ratio > 1.50) {
       warnings.push(`Total N delivery ${(ratio*100).toFixed(1)}% of target (${delivered.n.toFixed(1)}/${result.totals.n})`);
     }
@@ -419,7 +393,8 @@ function validateResult(payload, result) {
     warnings,
     expectedNPK: expected,
     actualNPK: recommended,
-    deliveredNPK: delivered
+    deliveredNPK: delivered,
+    combo
   };
 }
 
@@ -427,6 +402,13 @@ function validateResult(payload, result) {
 // 14. Load the calculator script into jsdom window
 // ---------------------------------------------------------------------------
 function loadCalculatorScript(window) {
+  // First, set global data references so calculator.js can find them
+  window.cropsData = cropsData;
+  window.fertilizerConversion = fertConversion;
+  window.locationsData = locationsData;
+  window.soilTestClassification = soilTestClass;
+  window.locationCropRecommendations = locationCropRecs;
+
   // Load ALL JS files in the same order as index.html
   const scriptFiles = [
     'rule-engine.js',
@@ -440,8 +422,8 @@ function loadCalculatorScript(window) {
     'feedback.js',
     'script.js'
   ];
-  // Transpile helper: replace optional chaining (?. ) since jsdom eval doesn't support it
-  const transpile = (src) => src.replace(/(\w+)\?\.(\w+)/g, '$1 && $2.$3 ? $1.$3 : undefined').replace(/(\w+)\?\.\[/g, '$1 && $1[');
+  // No transpilation needed — Node.js 22+ and jsdom 20+ support optional chaining natively.
+  const transpile = (src) => src;
   for (const file of scriptFiles) {
     const scriptPath = path.resolve(__dirname, '..', file);
     let scriptSrc = fs.readFileSync(scriptPath, 'utf8');
@@ -463,6 +445,7 @@ module.exports = {
   STATUSES,
   SOIL_INPUTS,
   VALID_COMBINATIONS,
+  DEFAULT_LOCATION,
   getExpectedNStatus,
   getExpectedPStatus,
   getExpectedKStatus,

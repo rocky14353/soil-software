@@ -4,7 +4,7 @@
  * Comprehensive Regression Test Suite
  * Soil fertilizer recommendation engine — Coromandel Fertilisers Ltd.
  *
- * Tests ALL crop × location × soil status combinations against
+ * Tests ALL crop × location × soil status × gromor combination against
  * expected NPK targets from location-crop-recommendations.json
  * and stage-split constraints from crops.json.
  *
@@ -192,8 +192,8 @@ describe('Comprehensive Regression Tests', () => {
     console.log(`[Comprehensive Test] Generated ${allPayloads.length} test cases`);
   });
 
-  test('payloads were generated', () => {
-    expect(allPayloads.length).toBeGreaterThan(500);
+  test('payloads were generated (all 50 crops × all 6 gromor combos)', () => {
+    expect(allPayloads.length).toBeGreaterThan(5000);
   });
 
   test('run all payloads and validate results', () => {
@@ -276,6 +276,5 @@ describe('Comprehensive Regression Tests', () => {
 // SUMMARY STATISTICS
 
 afterAll(() => {
-  // Summary is printed in the test above
   console.log('\n=== COMPREHENSIVE REGRESSION TEST COMPLETE ===');
 });

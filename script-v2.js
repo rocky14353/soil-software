@@ -82,7 +82,7 @@ function getCropKey(crop, season) {
 function getLocationBasedRecommendation(crop, season, location, fieldType, nStatus, pStatus, kStatus) {
     const cropKey = getCropKey(crop, season);
     
-    // Try to find in location-crop-recommendations
+    // Try location-based lookup first (PADDY crops: PADDY-KHARIF -> GODAVARI DELTA)
     if (locationCropRecommendations[cropKey] && locationCropRecommendations[cropKey][location]) {
         const rec = locationCropRecommendations[cropKey][location];
         return {
@@ -91,6 +91,20 @@ function getLocationBasedRecommendation(crop, season, location, fieldType, nStat
             k: rec.kStatus[kStatus] || rec.normal.k,
             gromorByPStatus: rec.gromorByPStatus
         };
+    }
+    
+    // Try fieldType-based lookup (MAIZE: MAIZE -> irrigated/rainfed)
+    const ftKey = (fieldType || 'Irrigated').toLowerCase();
+    if (locationCropRecommendations[cropKey] && locationCropRecommendations[cropKey][ftKey]) {
+        const rec = locationCropRecommendations[cropKey][ftKey];
+        if (rec.nStatus || rec.pStatus || rec.kStatus) {
+            return {
+                n: rec.nStatus[nStatus] || rec.normal.n,
+                p: rec.pStatus[pStatus] || rec.normal.p,
+                k: rec.kStatus[kStatus] || rec.normal.k,
+                gromorByPStatus: rec.gromorByPStatus
+            };
+        }
     }
     
     // Fallback to crop master data
