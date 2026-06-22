@@ -30,12 +30,12 @@ function showFeedbackForm(formData, results) {
             globalValidation: results.globalValidation || null,
             stages: results.recommendations.map(function(s) {
                 return {
-                    name: s.stageName || s.name,
+                    name: s.stage || s.stageName || s.name,
                     n: s.deliveredN || s.n || 0,
                     p: s.deliveredP || s.p || 0,
                     k: s.deliveredK || s.k || 0,
                     fertilizers: (s.fertilizers || []).map(function(f) {
-                        return { name: f.name, qty: f.qty || f.quantity, n: f.nContributed, p: f.pContributed, k: f.kContributed };
+                        return { name: f.name, qty: f.kgs || f.qty || f.quantity, n: f.nContributed, p: f.pContributed, k: f.kContributed };
                     })
                 };
             })

@@ -1130,7 +1130,20 @@ window.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, nPerS
             if (nToAdd <= 0.1) continue;
 
             const nKgs    = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
-            const rounded = roundToBag(nKgs);
+            // Try nearest rounding first, fall back to round-down if over cap
+            let rounded = roundToBag(nKgs);
+            const actualNutrientsFrom = (qty) => getNutrientsFromStraight(qty, nFertilizer);
+            
+            // If nearest rounding exceeds the stage cap, try rounding down
+            if (rounded.kgs > 0 && deliveredN + actualNutrientsFrom(rounded.kgs).n > stageTargetN * 1.12) {
+                const floorKgs = Math.floor(nKgs / 12.5) * 12.5;
+                if (floorKgs > 0) {
+                    const floorN = actualNutrientsFrom(floorKgs).n;
+                    if (deliveredN + floorN <= stageTargetN * 1.12) {
+                        rounded = { kgs: floorKgs, label: `${floorKgs/12.5} bag(s)`, bags: floorKgs/12.5 };
+                    }
+                }
+            }
 
             if (rounded.kgs <= 0) {
                 console.log(`[${combinationName}-topup] Stage ${stageIdx} N: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
