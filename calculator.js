@@ -79,13 +79,13 @@ window.classifyBoron = function classifyBoron(boron) {
 
 window.classifyManganese = function classifyManganese(mn) {
     if (!mn || mn === 0) return null;
-    if (mn < 5.0) return 'deficiency';
+    if (mn < 2.0) return 'deficiency';
     return 'sufficiency';
 }
 
 window.classifyIron = function classifyIron(fe) {
     if (!fe || fe === 0) return null;
-    if (fe < 10.0) return 'deficiency';
+    if (fe < 4.5) return 'deficiency';
     return 'sufficiency';
 }
 
@@ -1201,6 +1201,19 @@ window.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, nPerS
             const pHeadroom = Math.max(0, stageTargetP * 1.12 - deliveredP);
             if (pHeadroom <= 0.1) continue;
 
+            // For Basal stage: if a complex Gromor fertilizer (14-35-14, 28-28-0, 10-26-26)
+            // already provides P, prefer that single source over also adding SSP/DAP.
+            if (stageIdx === 0) {
+                const hasComplexPFertilizer = stage.fertilizers.some(f =>
+                    f.name && (f.name.includes('28-28-0') || f.name.includes('14-35-14') || f.name.includes('10-26-26')) &&
+                    (f.pContributed || 0) > 0.01
+                );
+                if (hasComplexPFertilizer) {
+                    console.log(`[${combinationName}-topup] Stage ${stageIdx} P: Skipped - single Gromor P source preferred at Basal`);
+                    continue;
+                }
+            }
+
             const stageTargets  = { n: nPerSplit[stageIdx] || 0, p: stageTargetP, k: kPerSplit[stageIdx] || 0 };
             const deliveredBefore = { n: delivered.n, p: deliveredP, k: delivered.k };
 
@@ -1374,7 +1387,18 @@ window.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, nPerS
             if (kToAdd <= 0.1) continue;
 
             const kKgs    = convertK2OToStraight(kToAdd, kFertName.toLowerCase());
-            const rounded = roundToBag(kKgs);
+            let rounded = roundToBag(kKgs);
+
+            // If nearest rounding exceeds the stage cap, try rounding down (same pattern as N top-up)
+            if (rounded.kgs > 0 && deliveredK + getNutrientsFromStraight(rounded.kgs, kFertName).k > stageTargetK * 1.12) {
+                const floorKgs = Math.floor(kKgs / 12.5) * 12.5;
+                if (floorKgs > 0) {
+                    const floorK = getNutrientsFromStraight(floorKgs, kFertName).k;
+                    if (deliveredK + floorK <= stageTargetK * 1.12) {
+                        rounded = { kgs: floorKgs, label: `${floorKgs/12.5} bag(s)`, bags: floorKgs/12.5 };
+                    }
+                }
+            }
 
             if (rounded.kgs <= 0) {
                 console.log(`[${combinationName}-topup] Stage ${stageIdx} K: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
@@ -5808,11 +5832,32 @@ window.calculateRecommendations = function calculateRecommendations(formData) {
     const phRecommendations = getPhRecommendations(phStatus);
     
     // Get combination info
-    const combinationInfo = locationsData.combinations?.[combination] || {
+    let combinationInfo = locationsData.combinations?.[combination] || {
         name: `Combination ${combination}`,
         description: 'Gromor fertilizer combination'
     };
-    
+
+    // Override name with the actual Gromor products used in the recommendation
+    // (selectP2O5Fertilizer picks dynamically, so the static JSON name may not match)
+    {
+        const gromorProductsUsed = [];
+        const seen = new Set();
+        recommendations.forEach(stage => {
+            (stage.fertilizers || []).forEach(fert => {
+                if (fert.name && fert.name.startsWith('Gromor ')) {
+                    const product = fert.name.replace('Gromor ', '');
+                    if (!seen.has(product)) {
+                        seen.add(product);
+                        gromorProductsUsed.push(product);
+                    }
+                }
+            });
+        });
+        if (gromorProductsUsed.length > 0) {
+            combinationInfo = { ...combinationInfo, name: gromorProductsUsed.join(' + ') };
+        }
+    }
+
     // ============================================================================
     // ENHANCEMENT: Calculation Steps Tracking (for Excel format transparency)
     // ============================================================================
