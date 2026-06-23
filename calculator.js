@@ -442,10 +442,11 @@ window.getNutrientsFromStraight = function getNutrientsFromStraight(fertilizerKg
 }
 
 window.convertNToStraight = function convertNToStraight(nKgs, fertilizer) {
-    const table = fertilizerConversion.nToStraight[fertilizer];
+    const fertKey = fertilizer.toLowerCase().replace(/\./g, ''); // normalize: A.S -> as
+    const table = fertilizerConversion.nToStraight[fertKey];
     if (!table) {
         // Fallback calculation
-        const factor = fertilizerConversion.conversionFactors[fertilizer];
+        const factor = fertilizerConversion.conversionFactors[fertKey];
         return nKgs * (factor || 2.2);
     }
     
