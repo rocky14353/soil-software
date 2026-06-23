@@ -1144,6 +1144,17 @@ window.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, nPerS
                     }
                 }
             }
+            
+            // If nearest rounding exceeds the global quota, try rounding down too
+            if (rounded.kgs > 0 && globalDelivered.n + actualNutrientsFrom(rounded.kgs).n > totalNRequired) {
+                const floorKgs = Math.floor(nKgs / 12.5) * 12.5;
+                if (floorKgs > 0) {
+                    const floorN = actualNutrientsFrom(floorKgs).n;
+                    if (globalDelivered.n + floorN <= totalNRequired) {
+                        rounded = { kgs: floorKgs, label: `${floorKgs/12.5} bag(s)`, bags: floorKgs/12.5 };
+                    }
+                }
+            }
 
             if (rounded.kgs <= 0) {
                 console.log(`[${combinationName}-topup] Stage ${stageIdx} N: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
