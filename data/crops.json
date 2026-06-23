@@ -101,19 +101,38 @@
   "Jowar": {
     "irrigated": {
       "rabi": {
-        "n": 24,
-        "p": 12,
-        "k": 12,
+        "n": 40,
+        "p": 24,
+        "k": 16,
         "splits": {
           "n": {
-            "count": 3,
-            "ratios": [0.25, 0.5, 0.25],
-            "stages": ["Basal", "at 25 days", "at 55 days"]
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
           },
           "k": {
             "count": 2,
             "ratios": [0.5, 0.5],
-            "stages": ["Basal", "at 55 days"]
+            "stages": ["Basal", "at 30 days"]
+          }
+        }
+      }
+    },
+    "rainfed": {
+      "rabi": {
+        "n": 32,
+        "p": 16,
+        "k": 12,
+        "splits": {
+          "n": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
+          },
+          "k": {
+            "count": 2,
+            "ratios": [0.5, 0.5],
+            "stages": ["Basal", "at 30 days"]
           }
         }
       }

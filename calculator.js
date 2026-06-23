@@ -5748,6 +5748,21 @@ window.calculateRecommendations = function calculateRecommendations(formData) {
         });
         if (gromorProductsUsed.length > 0) {
             combinationInfo = { ...combinationInfo, name: gromorProductsUsed.join(' + ') };
+        } else {
+            // No Gromor products used — build name from ALL distinct fertilizers used
+            const allFerts = [];
+            const seenFerts = new Set();
+            recommendations.forEach(stage => {
+                (stage.fertilizers || []).forEach(fert => {
+                    if (fert.name && !seenFerts.has(fert.name)) {
+                        seenFerts.add(fert.name);
+                        allFerts.push(fert.name);
+                    }
+                });
+            });
+            if (allFerts.length > 0) {
+                combinationInfo = { ...combinationInfo, name: allFerts.join(' + ') };
+            }
         }
     }
 
@@ -5765,6 +5780,17 @@ window.calculateRecommendations = function calculateRecommendations(formData) {
             p: rec.normal?.p || recommendedP,
             k: rec.normal?.k || recommendedK
         };
+    } else if (locationCropRecommendations[cropKey]) {
+        // Also check fieldType-based path (e.g. MAIZE stores data under "irrigated" not location name)
+        const ftKey = (fieldType || 'Irrigated').toLowerCase();
+        const rec = locationCropRecommendations[cropKey][ftKey];
+        if (rec && rec.normal) {
+            baseRecommendation = {
+                n: rec.normal?.n || recommendedN,
+                p: rec.normal?.p || recommendedP,
+                k: rec.normal?.k || recommendedK
+            };
+        }
     }
     
     // Calculate adjustments
