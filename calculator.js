@@ -464,144 +464,56 @@ window.convertK2OToStraight = function convertK2OToStraight(k2oKgs, fertilizer) 
 }
 
 window.roundToBagPrecise = function roundToBagPrecise(kgs, bagSize = 50, roundUp = false) {
-    // Generate options with 2.5kg and 5kg steps
-    const options = [];
-    
-    // 5kg steps: 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60...
-    for (let i = 5; i <= Math.ceil(kgs) + 20; i += 5) {
-        options.push(i);
-    }
-    
-    // 2.5kg steps: 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5...
-    for (let i = 2.5; i <= Math.ceil(kgs) + 20; i += 5) {
-        options.push(i);
-    }
-    
-    // Remove duplicates and sort
-    const uniqueOptions = [...new Set(options)].sort((a, b) => a - b);
-    
-    // Find the two closest options
-    let lower = 0;
-    let upper = uniqueOptions.length > 0 ? uniqueOptions[0] : kgs;
-    
-    for (let i = 0; i < uniqueOptions.length; i++) {
-        if (uniqueOptions[i] <= kgs) {
-            lower = uniqueOptions[i];
-            upper = uniqueOptions[i + 1] || uniqueOptions[i];
-        } else {
-            upper = uniqueOptions[i];
-            break;
-        }
-    }
-    
-    // Safety check: if upper is still 0 or undefined, use kgs rounded up
-    if (!upper || upper === 0) {
-        upper = Math.ceil(kgs / 5) * 5; // Round to nearest 5kg
-    }
-    
-    // If roundUp is true (for P/N), always round up
-    if (roundUp) {
-        const rounded = upper;
-        const bags = rounded / bagSize;
-        return {
-            kgs: rounded,
-            bags: bags,
-            fullBags: Math.floor(bags),
-            remainder: rounded % bagSize,
-            label: `${rounded} kg (${bags.toFixed(2)} bag(s))`,
-            original: kgs
-        };
-    }
-    
-    // Otherwise use midpoint tolerance (for K)
-    const midpoint = (lower + upper) / 2;
-    const rounded = kgs < midpoint ? lower : upper;
-    const bags = rounded / bagSize;
-    
+    // Return exact quantity — no rounding to bag sizes
+    // The output will tell the farmer the exact kg and approximate bag fraction
+    const bags = kgs / bagSize;
+    const displayKgs = Math.round(kgs * 10) / 10; // Round to 1 decimal for display
     return {
-        kgs: rounded,
+        kgs: kgs,                          // Exact kg (no rounding)
         bags: bags,
-        fullBags: Math.floor(bags),
-        remainder: rounded % bagSize,
-        label: `${rounded} kg (${bags.toFixed(2)} bag(s))`,
+        fullBags: Math.floor(bags),         // Integer bags
+        remainder: kgs % bagSize,
+        label: `${displayKgs} kg (~${bags.toFixed(2)} bags)`,  // Show exact + bag fraction
         original: kgs
     };
 }
 
 window.roundToBag = function roundToBag(kgs, bagSize = 50) {
-    const fullBag = Math.round(kgs / bagSize);
-    const halfBag = Math.round(kgs / (bagSize / 2)) * 0.5;
-    const quarterBag = Math.round(kgs / (bagSize / 4)) * 0.25;
-    
-    const options = [
-        { value: fullBag * bagSize, label: `${fullBag} bag(s)`, bags: fullBag },
-        { value: halfBag * bagSize, label: `${halfBag} bag(s)`, bags: halfBag },
-        { value: quarterBag * bagSize, label: `${quarterBag} bag(s)`, bags: quarterBag }
-    ];
-    
-    const nearest = options.reduce((prev, curr) => {
-        return Math.abs(curr.value - kgs) < Math.abs(prev.value - kgs) ? curr : prev;
-    });
-    
+    // Return exact quantity — no rounding to bag sizes
+    // The farmer will be told the exact kg with fractional bag count
+    if (kgs <= 0) return { kgs: 0, label: '0 kg', bags: 0, fullBags: 0, remainder: 0, original: kgs };
+    const bags = kgs / bagSize;
+    const displayKgs = Math.round(kgs * 10) / 10;
     return {
-        kgs: nearest.value,
-        label: nearest.label,
-        bags: nearest.bags,
-        fullBags: Math.floor(nearest.bags),
-        remainder: nearest.value % bagSize,
+        kgs: kgs,
+        label: `${displayKgs} kg (~${bags.toFixed(2)} bags)`,
+        bags: bags,
+        fullBags: Math.floor(bags),
+        remainder: kgs % bagSize,
         original: kgs
     };
 }
 
 window.roundToBagUp = function roundToBagUp(kgs, bagSize = 45) {
-    const fullBag = Math.ceil(kgs / bagSize);
-    const halfBag = Math.ceil(kgs / (bagSize / 2)) * 0.5;
-    const quarterBag = Math.ceil(kgs / (bagSize / 4)) * 0.25;
-    
-    const options = [
-        { value: fullBag * bagSize, label: `${fullBag} bag(s)`, bags: fullBag },
-        { value: halfBag * bagSize, label: `${halfBag} bag(s)`, bags: halfBag },
-        { value: quarterBag * bagSize, label: `${quarterBag} bag(s)`, bags: quarterBag }
-    ];
-    
-    // Find the smallest option that meets or exceeds the requirement
-    const validOptions = options.filter(opt => opt.value >= kgs);
-    if (validOptions.length > 0) {
-        const smallest = validOptions.reduce((prev, curr) => {
-            return curr.value < prev.value ? curr : prev;
-        });
-        return {
-            kgs: smallest.value,
-            bags: smallest.bags,
-            label: smallest.label,
-            original: kgs
-        };
-    }
-    
-    // Fallback to nearest if somehow all are below (shouldn't happen with ceil)
-    return roundToBag(kgs, bagSize);
+    // Return exact quantity — no rounding to bag sizes
+    // The farmer will be told the exact kg with fractional bag count
+    if (kgs <= 0) return { kgs: 0, label: '0 kg', bags: 0, original: kgs };
+    const bags = kgs / bagSize;
+    const displayKgs = Math.round(kgs * 10) / 10;
+    return {
+        kgs: kgs,
+        label: `${displayKgs} kg (~${bags.toFixed(2)} bags)`,
+        bags: bags,
+        fullBags: Math.floor(bags),
+        remainder: kgs % bagSize,
+        original: kgs
+    };
 }
 
 window.roundToBagSmart = function roundToBagSmart(kgs, bagSize = 45, minRequired = null, tolerance = 0.10) {
-    // If no minimum requirement specified, use standard rounding
-    if (minRequired === null) {
-        return roundToBag(kgs, bagSize);
-    }
-    
-    // Calculate what would be delivered if we round down
-    const roundedDown = roundToBag(kgs, bagSize);
-    const wouldDeliver = roundedDown.kgs;
-    
-    // Check if rounding down would result in under-delivery beyond tolerance
-    const minAllowed = minRequired * (1 - tolerance);
-    
-    if (wouldDeliver < minAllowed) {
-        // Round up to ensure minimum is met
-        return roundToBagUp(kgs, bagSize);
-    }
-    
-    // Otherwise, round to nearest (minimizes excess)
-    return roundedDown;
+    // No bag-size rounding needed — roundToBag returns exact quantities
+    // The display handles the bag fraction for the farmer
+    return roundToBag(kgs, bagSize);
 }
 
 window.checkPreference = function checkPreference(fertilizer, preferences) {
@@ -1130,31 +1042,11 @@ window.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, nPerS
             if (nToAdd <= 0.1) continue;
 
             const nKgs    = convertNToStraight(nToAdd, nFertilizer.toLowerCase());
-            // Try nearest rounding first, fall back to round-down if over cap
             let rounded = roundToBag(nKgs);
             const actualNutrientsFrom = (qty) => getNutrientsFromStraight(qty, nFertilizer);
             
-            // If nearest rounding exceeds the stage cap, try rounding down
-            if (rounded.kgs > 0 && deliveredN + actualNutrientsFrom(rounded.kgs).n > stageTargetN * 1.12) {
-                const floorKgs = Math.floor(nKgs / 12.5) * 12.5;
-                if (floorKgs > 0) {
-                    const floorN = actualNutrientsFrom(floorKgs).n;
-                    if (deliveredN + floorN <= stageTargetN * 1.12) {
-                        rounded = { kgs: floorKgs, label: `${floorKgs/12.5} bag(s)`, bags: floorKgs/12.5 };
-                    }
-                }
-            }
-            
-            // If nearest rounding exceeds the global quota, try rounding down too
-            if (rounded.kgs > 0 && globalDelivered.n + actualNutrientsFrom(rounded.kgs).n > totalNRequired) {
-                const floorKgs = Math.floor(nKgs / 12.5) * 12.5;
-                if (floorKgs > 0) {
-                    const floorN = actualNutrientsFrom(floorKgs).n;
-                    if (globalDelivered.n + floorN <= totalNRequired) {
-                        rounded = { kgs: floorKgs, label: `${floorKgs/12.5} bag(s)`, bags: floorKgs/12.5 };
-                    }
-                }
-            }
+            // No floor-down fallback needed — roundToBag returns exact quantities
+            // (bag rounding is handled in the display only)
 
             if (rounded.kgs <= 0) {
                 console.log(`[${combinationName}-topup] Stage ${stageIdx} N: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
@@ -1399,17 +1291,6 @@ window.applyStageSafeTopUp = function applyStageSafeTopUp(recommendations, nPerS
 
             const kKgs    = convertK2OToStraight(kToAdd, kFertName.toLowerCase());
             let rounded = roundToBag(kKgs);
-
-            // If nearest rounding exceeds the stage cap, try rounding down (same pattern as N top-up)
-            if (rounded.kgs > 0 && deliveredK + getNutrientsFromStraight(rounded.kgs, kFertName).k > stageTargetK * 1.12) {
-                const floorKgs = Math.floor(kKgs / 12.5) * 12.5;
-                if (floorKgs > 0) {
-                    const floorK = getNutrientsFromStraight(floorKgs, kFertName).k;
-                    if (deliveredK + floorK <= stageTargetK * 1.12) {
-                        rounded = { kgs: floorKgs, label: `${floorKgs/12.5} bag(s)`, bags: floorKgs/12.5 };
-                    }
-                }
-            }
 
             if (rounded.kgs <= 0) {
                 console.log(`[${combinationName}-topup] Stage ${stageIdx} K: Skipped - rounded qty = ${rounded.kgs.toFixed(2)} kg`);
