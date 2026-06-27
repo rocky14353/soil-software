@@ -111,9 +111,9 @@
             "stages": ["Basal", "at 30 days"]
           },
           "k": {
-            "count": 2,
-            "ratios": [0.5, 0.5],
-            "stages": ["Basal", "at 30 days"]
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
           }
         }
       }
@@ -130,9 +130,9 @@
             "stages": ["Basal", "at 30 days"]
           },
           "k": {
-            "count": 2,
-            "ratios": [0.5, 0.5],
-            "stages": ["Basal", "at 30 days"]
+            "count": 1,
+            "ratios": [1],
+            "stages": ["Basal"]
           }
         }
       }
