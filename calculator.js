@@ -649,18 +649,12 @@ window.selectNFertilizer = function selectNFertilizer(nRequired, preferences, sS
 window.selectKFertilizer = function selectKFertilizer(kRequired, preferences, sStatus, phStatus) {
     if (kRequired <= 0) return null;
     
-    // If S is low or pH is alkaline, prefer SOP (contains 18% S)
-    if ((sStatus === 'low' || phStatus === 'moderatelyAlkaline' || phStatus === 'highlyAlkaline') 
-        && shouldUseFertilizer('SOP', preferences, sStatus, phStatus)) {
+    // If S is low, prefer SOP (contains 18% S) to supply sulfur
+    if (sStatus === 'low' && shouldUseFertilizer('SOP', preferences, sStatus, phStatus)) {
         return 'SOP';
     }
     
-    // If S is high, prefer MOP (no sulfur)
-    if (sStatus === 'high' && shouldUseFertilizer('MOP', preferences, sStatus, phStatus)) {
-        return 'MOP';
-    }
-    
-    // Default to MOP
+    // Default to MOP (cheaper, higher K concentration 60% vs 50%)
     if (shouldUseFertilizer('MOP', preferences, sStatus, phStatus)) {
         return 'MOP';
     }
@@ -5889,6 +5883,65 @@ window.calculateRecommendations = function calculateRecommendations(formData) {
         p: recommendedP,
         k: recommendedK
     });
+    
+    // ============================================================================
+    // ENHANCEMENT: Apply minimum fertilizer threshold (Issue #18)
+    // ============================================================================
+    // If any fertilizer grade has qty < 5 kg in a stage, shift its nutrients to
+    // the same fertilizer in the last available stage for practical application.
+    const MIN_FERTILIZER_QTY = 5;
+    function applyMinFertilizerThreshold(recommendations) {
+        for (let s = 0; s < recommendations.length - 1; s++) {
+            const stage = recommendations[s];
+            const fertilizersToRemove = [];
+            
+            for (let f = stage.fertilizers.length - 1; f >= 0; f--) {
+                const fert = stage.fertilizers[f];
+                const qty = fert.kgs || 0;
+                
+                if (qty > 0 && qty < MIN_FERTILIZER_QTY) {
+                    const fertName = fert.name;
+                    const fertN = fert.nContributed || 0;
+                    const fertP = fert.pContributed || 0;
+                    const fertK = fert.kContributed || 0;
+                    
+                    // Find the same fertilizer in a later stage
+                    let targetStage = null;
+                    let targetFertIndex = -1;
+                    
+                    for (let ts = s + 1; ts < recommendations.length; ts++) {
+                        const laterStage = recommendations[ts];
+                        for (let tf = 0; tf < laterStage.fertilizers.length; tf++) {
+                            if (laterStage.fertilizers[tf].name === fertName) {
+                                targetStage = laterStage;
+                                targetFertIndex = tf;
+                                break;
+                            }
+                        }
+                        if (targetStage) break;
+                    }
+                    
+                    if (targetStage && targetFertIndex >= 0) {
+                        // Add to the same fertilizer in the target stage
+                        const targetFert = targetStage.fertilizers[targetFertIndex];
+                        targetFert.kgs = (targetFert.kgs || 0) + qty;
+                        targetFert.nContributed = (targetFert.nContributed || 0) + fertN;
+                        targetFert.pContributed = (targetFert.pContributed || 0) + fertP;
+                        targetFert.kContributed = (targetFert.kContributed || 0) + fertK;
+                        
+                        // Remove from current stage
+                        stage.fertilizers.splice(f, 1);
+                        console.log(`[MinThreshold] Moved ${qty.toFixed(2)} kg ${fertName} from stage ${s} to stage ${targetStage.stageName || s+1}`);
+                    } else {
+                        // No later stage with same fertilizer - keep it but log a note
+                        console.log(`[MinThreshold] Keeping ${qty.toFixed(2)} kg ${fertName} in stage ${s} - no later stage with same fertilizer`);
+                    }
+                }
+            }
+        }
+    }
+    
+    applyMinFertilizerThreshold(recommendations);
     
     // ============================================================================
     // ENHANCEMENT: Nutrient Contribution Table
