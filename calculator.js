@@ -138,12 +138,12 @@ window.getPhRecommendations = function getPhRecommendations(phClassification) {
         },
         moderatelyAlkaline: {
             title: "Moderately Alkaline Soil (pH 7.9-8.4)",
-            advisory: "Apply gypsum (CaSO4) or sulfur to lower pH if needed: 1-2 tons/acre. Use acid-forming fertilizers. Monitor micronutrient deficiencies (especially Fe, Zn, Mn).",
+            advisory: "Monitor crop for micronutrient availability. Use acid-forming fertilizers. See micronutrient recommendations below for Gypsum application details.",
             priority: "medium"
         },
         highlyAlkaline: {
             title: "Highly Alkaline Soil (pH ≥ 8.5)",
-            advisory: "Problematic soil. Apply gypsum (2-4 tons/acre) or elemental sulfur before planting. Use acid-forming fertilizers. Expect micronutrient deficiencies - consider foliar applications of Fe, Zn, Mn. Consider soil amendments and organic matter addition.",
+            advisory: "Problematic soil. Use acid-forming fertilizers. Expect micronutrient deficiencies — consider foliar applications of Fe, Zn, Mn. See micronutrient recommendations below for Gypsum application.",
             priority: "high"
         }
     };
@@ -178,8 +178,8 @@ window.getMicronutrientRecommendations = function getMicronutrientRecommendation
         recommendations.push({
             nutrient: 'Zinc Sulphate (ZnSO4·7H2O 21%)',
             condition: 'Zinc deficient — Zn < 1.5 ppm',
-            recommendation: 'Soil application: Apply 10 kg/acre Zinc Sulphate (33%) as basal. Do NOT mix with complex phosphatic fertilizers (may form insoluble zinc phosphate). For foliar: Spray 1 gm/L ZnSO4 (33%) at tillering stage if basal application is not possible.',
-            dose: '10 kg/acre (soil) or 1 gm/L (foliar spray)',
+            recommendation: 'Soil application: Apply 10 kg/acre Zinc Sulphate (33%) as basal. Do NOT mix with complex phosphatic fertilizers (may form insoluble zinc phosphate). For foliar: If basal application is not possible, spray 18 g/L ZnSO4 (33%) at tillering stage.',
+            dose: '10 kg/acre (soil) or 18 g/L (foliar spray)',
             timing: 'Basal (soil) or Tillering (foliar)',
             priority: 'high'
         });
