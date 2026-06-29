@@ -158,6 +158,60 @@ window.getCropKey = function getCropKey(crop, season) {
     return crop.toUpperCase().replace(/\s+/g, '-');
 }
 
+window.getMicronutrientRecommendations = function getMicronutrientRecommendations(phStatus, znStatus, bStatus, mgStatus) {
+    const recommendations = [];
+    
+    // Gypsum recommendation for high pH (>8)
+    if (phStatus === 'moderatelyAlkaline' || phStatus === 'highlyAlkaline') {
+        recommendations.push({
+            nutrient: 'Gypsum (CaSO4·2H2O)',
+            condition: 'pH > 8.0 — Moderately/Highly Alkaline',
+            recommendation: 'Apply 500 kg Gypsum per acre as basal dose. Till well before fertilizer application for better incorporation.',
+            dose: '500 kg/acre',
+            timing: 'Basal (before fertilizer application)',
+            priority: 'high'
+        });
+    }
+    
+    // Zinc deficiency
+    if (znStatus === 'deficiency') {
+        recommendations.push({
+            nutrient: 'Zinc Sulphate (ZnSO4·7H2O 21%)',
+            condition: 'Zinc deficient — Zn < 1.5 ppm',
+            recommendation: 'Soil application: Apply 10 kg/acre Zinc Sulphate (33%) as basal. Do NOT mix with complex phosphatic fertilizers (may form insoluble zinc phosphate). For foliar: Spray 1 gm/L ZnSO4 (33%) at tillering stage if basal application is not possible.',
+            dose: '10 kg/acre (soil) or 1 gm/L (foliar spray)',
+            timing: 'Basal (soil) or Tillering (foliar)',
+            priority: 'high'
+        });
+    }
+    
+    // Boron deficiency
+    if (bStatus === 'deficiency') {
+        recommendations.push({
+            nutrient: 'Boron (Borax/Boric Acid)',
+            condition: 'Boron deficient — B < 0.5 ppm',
+            recommendation: 'Soil application: Apply Boron Pentahydrate @ 2 kg/acre as basal. Can be applied along with complex fertilizers or Urea. For foliar: If soil application is not possible, spray Boron 20% @ 1 gm/L water at just before flowering stage.',
+            dose: '2 kg/acre (soil) or 1 gm/L (foliar spray)',
+            timing: 'Basal (soil) or Just before flowering (foliar)',
+            priority: 'high'
+        });
+    }
+    
+    // Magnesium deficiency
+    if (mgStatus === 'deficiency') {
+        recommendations.push({
+            nutrient: 'Magnesium Sulphate (MgSO4·7H2O)',
+            condition: 'Magnesium deficient — Mg < 1.0 cmol/kg',
+            recommendation: 'Apply 25 kg Magnesium Sulphate per acre as basal dose. Do not mix with complex fertilizers.',
+            dose: '25 kg/acre',
+            timing: 'Basal',
+            priority: 'medium'
+        });
+    }
+    
+    return recommendations.length > 0 ? recommendations : null;
+}
+
 window.getLocationBasedRecommendation = function getLocationBasedRecommendation(crop, season, location, fieldType, nStatus, pStatus, kStatus) {
     const cropKey = getCropKey(crop, season);
     
@@ -5718,6 +5772,9 @@ window.calculateRecommendations = function calculateRecommendations(formData) {
     // Get pH-based recommendations
     const phRecommendations = getPhRecommendations(phStatus);
     
+    // Get micronutrient recommendations (Gypsum, Zn, B, Mg)
+    const micronutrientRecommendations = getMicronutrientRecommendations(phStatus, znStatus, bStatus, mgStatus);
+    
     // Get combination info
     let combinationInfo = locationsData.combinations?.[combination] || {
         name: `Combination ${combination}`,
@@ -6114,6 +6171,7 @@ window.calculateRecommendations = function calculateRecommendations(formData) {
         combination: combinationInfo,
         soilTestStatus: { nStatus, pStatus, kStatus, sStatus, phStatus, ecStatus, caStatus, mgStatus, znStatus, bStatus, mnStatus, feStatus, cuStatus, moStatus, clStatus, soilType },
         phRecommendations: phRecommendations,
+        micronutrientRecommendations: micronutrientRecommendations,
         recommendedNPK: {
             n: recommendedN,
             p: recommendedP,

@@ -113,6 +113,29 @@ window.displayResults = function displayResults(results) {
         `;
     }
     
+    // Micronutrient Recommendations (Gypsum, Zinc, Boron, Magnesium)
+    if (results.micronutrientRecommendations && results.micronutrientRecommendations.length > 0) {
+        html += `
+        <div class="recommendation-card" style="border-left: 4px solid #8e44ad;">
+            <h3>🌱 Micronutrient & Soil Amendment Recommendations</h3>
+        `;
+        results.micronutrientRecommendations.forEach(rec => {
+            const priorityColor = rec.priority === 'high' ? '#e74c3c' : rec.priority === 'medium' ? '#f39c12' : '#3498db';
+            html += `
+            <div style="margin-top: 15px; padding: 15px; background: #f3e5f5; border-radius: 5px; border-left: 4px solid ${priorityColor};">
+                <h4 style="margin: 0 0 8px 0; color: #6a1b9a;">${rec.nutrient}</h4>
+                <p style="margin: 5px 0; font-size: 0.9em; color: #666;"><strong>Condition:</strong> ${rec.condition}</p>
+                <p style="margin: 8px 0; line-height: 1.6; color: #333;">${rec.recommendation}</p>
+                <div style="margin-top: 10px; display: flex; gap: 20px; flex-wrap: wrap;">
+                    <span style="background: #e1bee7; padding: 4px 12px; border-radius: 12px; font-size: 0.85em;"><strong>Dose:</strong> ${rec.dose}</span>
+                    <span style="background: #e1bee7; padding: 4px 12px; border-radius: 12px; font-size: 0.85em;"><strong>Timing:</strong> ${rec.timing}</span>
+                </div>
+            </div>
+            `;
+        });
+        html += `</div>`;
+    }
+    
     // STEP 2: Total Requirements (after Nutrient Analysis)
     html += `
         <div class="recommendation-card">
@@ -311,6 +334,16 @@ window.displayResults = function displayResults(results) {
     
     html += `</div>`;
     
+    // "+ More" button to expand additional details
+    html += `
+        <div style="text-align: center; margin: 20px 0;">
+            <button id="moreDetailsBtn" onclick="toggleMoreDetails()" style="background: none; border: 2px dashed #3498db; color: #3498db; padding: 10px 30px; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: 600;">
+                + Add More
+            </button>
+        </div>
+        <div id="moreDetailsSection" style="display: none;">
+    `;
+    
     // ENHANCEMENT: Nutrient Contribution Table (Excel format)
     if (results.nutrientContributionTable && results.nutrientContributionTable.length > 0) {
         html += `
@@ -433,7 +466,23 @@ window.displayResults = function displayResults(results) {
         html += `</ul></div>`;
     }
     
+    // Close the "+ More" section div
+    html += `</div>`;
+    
     resultsContent.innerHTML = html;
     resultsSection.style.display = 'block';
     resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Toggle "+ More" details section
+window.toggleMoreDetails = function toggleMoreDetails() {
+    const section = document.getElementById('moreDetailsSection');
+    const btn = document.getElementById('moreDetailsBtn');
+    if (section && btn) {
+        const isHidden = section.style.display === 'none';
+        section.style.display = isHidden ? 'block' : 'none';
+        btn.textContent = isHidden ? '- Show Less' : '+ Add More';
+        btn.style.borderColor = isHidden ? '#27ae60' : '#3498db';
+        btn.style.color = isHidden ? '#27ae60' : '#3498db';
+    }
 }
